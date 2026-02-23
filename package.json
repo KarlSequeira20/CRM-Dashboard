@@ -1,0 +1,10 @@
+{
+  "name": "crm-intelligence-agent",
+  "version": "1.0.0",
+  "description": "Root runner for CRM Intelligence Agent",
+  "scripts": {
+    "start": "npm run start:backend",
+    "start:backend": "npm run start:api --prefix backend",
+    "install:backend": "npm install && npm install --prefix backend"
+  }
+}

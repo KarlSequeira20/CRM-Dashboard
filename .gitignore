@@ -1,0 +1,20 @@
+# Dependencies
+node_modules/
+venv/
+.venv/
+__pycache__/
+*.pyc
+
+# Sensitive Environment Variables
+.env
+backend/.env
+
+# OS / IDE files
+.DS_Store
+.vscode/
+
+# Build artifacts
+dist/
+build/
+*.log
+latest_ai_summary.json
