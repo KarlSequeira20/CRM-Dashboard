@@ -56,37 +56,34 @@ mindmap
 ## 🏗️ System Architecture
 
 ```mermaid
-graph TD
-    subgraph "Data Acquisition"
-        A[Zoho CRM (Live API)]
-    end
+flowchart TD
+    %% Node Definitions
+    Zoho([<b>Zoho CRM API</b><br/>Live Data Source])
+    Sync{<b>Sync Engine</b><br/>Incremental Extraction}
+    Supa[(<b>Supabase Cloud</b><br/>PostgreSQL + JSONB)]
+    Metrics[<b>Analytics Engine</b><br/>SQL Funnel Logic]
+    Ollama[[<b>Ollama AI Node</b><br/>Local Llama 3.2 Agent]]
+    Dash[<b>Executive UI</b><br/>Streamlit Dashboard]
+    WhatsApp[<b>WhatsApp Pulse</b><br/>Twilio Delivery]
 
-    subgraph "Incremental Sync"
-        B[Incremental Sync (If-Modified-Since)]
-    end
+    %% Connections
+    Zoho ---|Pull| Sync
+    Sync ---|Upsert| Supa
+    Supa ---|Query| Metrics
+    Metrics ---|Payload| Ollama
+    Ollama ---|Visual| Dash
+    Ollama ---|Direct| WhatsApp
 
-    subgraph "Data Storage"
-        C["Supabase Cloud (PostgreSQL)"]
-        D["raw_data JSONB"]
-    end
+    %% Styling
+    classDef source fill:#EE2E24,stroke:#333,stroke-width:2px,color:#fff;
+    classDef storage fill:#3ECF8E,stroke:#333,stroke-width:2px,color:#fff;
+    classDef logic fill:#6366F1,stroke:#333,stroke-width:2px,color:#fff;
+    classDef delivery fill:#FF4B4B,stroke:#333,stroke-width:2px,color:#fff;
 
-    subgraph "Analytics & AI"
-        E["SQL Funnel Analytics"]
-        F["Llama 3.2 (Local Ollama)"]
-    end
-
-    subgraph "Reporting & Alerts"
-        G["Streamlit Dashboard"]
-        H["WhatsApp (Twilio)"]
-    end
-
-    A --> B
-    B --> C
-    C --> D
-    C --> E
-    E --> F
-    F --> G
-    F --> H
+    class Zoho source;
+    class Supa storage;
+    class Sync,Metrics,Ollama logic;
+    class Dash,WhatsApp delivery;
 ```
 
 ---
