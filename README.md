@@ -1,171 +1,126 @@
-# 🏠 AHA Smart Homes — AI-Powered CRM Intelligence Platform
+# AI-Powered CRM Intelligence Agent
 
-[![Streamlit App](https://img.shields.io/badge/Streamlit-FF4B4B?style=for-the-badge&logo=Streamlit&logoColor=white)](https://streamlit.io/)
-[![Supabase](https://img.shields.io/badge/Supabase-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)](https://supabase.com/)
-[![Ollama](https://img.shields.io/badge/Ollama-000000?style=for-the-badge&logo=ollama&logoColor=white)](https://ollama.com/)
-[![Twilio](https://img.shields.io/badge/Twilio-F22F46?style=for-the-badge&logo=Twilio&logoColor=white)](https://www.twilio.com/)
-[![Zoho](https://img.shields.io/badge/Zoho_CRM-EE2E24?style=for-the-badge&logo=zoho&logoColor=white)](https://www.zoho.com/crm/)
-
-> **"Extract everything. Store everything. Understand everything."**
-
-A fully automated, production-grade CRM intelligence system that pulls all data from Zoho CRM across every module, stores it with zero data loss in a Supabase PostgreSQL cloud database, performs deep SQL analytics, and generates AI-driven executive insights using a private local Llama 3.2 model.
+A production-grade, end-to-end automated CRM Intelligence pipeline that extracts daily data from Zoho CRM, parses it incrementally into a Supabase data warehouse, synthesizes the metrics into actionable insights using a local Llama 3.2 AI, and delivers the results via WhatsApp.
 
 ---
 
-## ✨ Key Features
+## � Workflow Overview
 
-- **🚀 Real-Time Dashboard**: 15+ dynamic Plotly charts with zero-cache latency for critical KPIs.
-- **🧠 Local AI Analyst**: Private, on-device strategic briefings via Ollama (Llama 3.2).
-- **📱 WhatsApp Strategic Pulse**: 3-point mobile briefings (Metrics, Signals, Focus) sent daily.
-- **💬 Interactive Commands**: Type `UPDATE` in WhatsApp to trigger an on-demand sync and briefing.
-- **📊 JSONB ELT Pattern**: Dynamic module extraction ensuring no data is ever lost.
-
----
-
-## 📸 Executive Dashboard Preview
-
-![Executive Dashboard](/Users/patrick/.gemini/antigravity/brain/4ec07683-150c-4cc1-97cc-9f71940839d7/dashboard_full_view_after_sync_1771870255607.png)
-
----
-
-## 🧠 Strategic Mind Map
-
-```mermaid
-mindmap
-  root((AHA CRM Intelligence))
-    Data Ingestion
-      Zoho CRM API
-      Incremental Sync
-      JSONB Storage
-    Analytics Engine
-      PostgreSQL Analytics
-      Funnel Metrics
-      Source Distribution
-    AI Intelligence
-      Ollama / Llama 3.2
-      Strategic Narratives
-      Executive Briefings
-    Reporting
-      Streamlit Dashboard
-      WhatsApp Automation
-      Real-Time Refresh
-```
-
----
-
-## 🏗️ System Architecture
+The system operates as a daily automated pipeline, moving data from the source CRM through an AI analysis layer to final delivery.
 
 ```mermaid
 flowchart TD
-    %% Node Definitions
-    Zoho([<b>Zoho CRM API</b><br/>Live Data Source])
-    Sync{<b>Sync Engine</b><br/>Incremental Extraction}
-    Supa[(<b>Supabase Cloud</b><br/>PostgreSQL + JSONB)]
-    Metrics[<b>Analytics Engine</b><br/>SQL Funnel Logic]
-    Ollama[[<b>Ollama AI Node</b><br/>Local Llama 3.2 Agent]]
-    Dash[<b>Executive UI</b><br/>Streamlit Dashboard]
-    WhatsApp[<b>WhatsApp Pulse</b><br/>Twilio Delivery]
+    %% Define Styles
+    classDef default fill:#f8fafc,stroke:#cbd5e1,stroke-width:1px,color:#334155
+    classDef zoho fill:#eef2ff,stroke:#6366f1,stroke-width:2px,color:#4338ca
+    classDef db fill:#f0fdf4,stroke:#22c55e,stroke-width:2px,color:#15803d
+    classDef ai fill:#fff7ed,stroke:#f97316,stroke-width:2px,color:#c2410c
+    classDef api fill:#fdf4ff,stroke:#d946ef,stroke-width:2px,color:#a21caf
+    classDef sms fill:#ecfdf5,stroke:#10b981,stroke-width:2px,color:#047857
 
-    %% Connections
-    Zoho ---|Pull| Sync
-    Sync ---|Upsert| Supa
-    Supa ---|Query| Metrics
-    Metrics ---|Payload| Ollama
-    Ollama ---|Visual| Dash
-    Ollama ---|Direct| WhatsApp
+    %% Nodes
+    A[Zoho CRM API<br/>Leads & Deals]:::zoho
+    B{Node.js Daemon<br/>Cron Scheduler}:::default
+    C[(Supabase Postgres<br/>Metrics & Synced Rows)]:::db
+    D[Ollama Daemon<br/>Llama 3.2 1B Model]:::ai
+    E[Express.js API Layer<br/>Live Metric JSON]:::api
+    G[Twilio API<br/>WhatsApp Sender]:::sms
 
-    %% Styling
-    classDef source fill:#EE2E24,stroke:#333,stroke-width:2px,color:#fff;
-    classDef storage fill:#3ECF8E,stroke:#333,stroke-width:2px,color:#fff;
-    classDef logic fill:#6366F1,stroke:#333,stroke-width:2px,color:#fff;
-    classDef delivery fill:#FF4B4B,stroke:#333,stroke-width:2px,color:#fff;
-
-    class Zoho source;
-    class Supa storage;
-    class Sync,Metrics,Ollama logic;
-    class Dash,WhatsApp delivery;
+    %% Edges
+    B -- "1. Fetches incremental Delta" --> A
+    A -- "2. Returns Modified Records" --> B
+    B -- "3. Upserts & Runs SQL Aggregations" --> C
+    B -- "4. Feeds SQL Metrics + JSON Prompt" --> D
+    D -- "5. Returns strict Insights JSON" --> B
+    B -- "6. Saves AI Summary Payload" --> C
+    B -- "7. Broadcasts Summary string" --> G
+    
+    E -- "GET /api/metrics" --> C
 ```
 
 ---
 
-## 📂 Project Structure
+## 🛠 Setup Instructions
 
-```text
-AHA Smart Homes Project /
-├── backend/
-│   ├── src/
-│   │   ├── ai/
-│   │   │   └── ollamaClient.js      # Executive Briefing Generator (Llama 3.2 Agent)
-│   │   ├── analytics/
-│   │   │   └── metrics.js           # Funnel & Revenue Logic (PostgreSQL + JS)
-│   │   ├── api/
-│   │   │   ├── aiRoutes.js          # REST API for insights & triggers
-│   │   │   └── server.js            # Express API Server (Webhook & Sync Trigger)
-│   │   ├── auth/
-│   │   │   └── zohoAuth.js          # Zoho OAuth 2.0 Client & Token Rotation
-│   │   ├── config/
-│   │   │   └── env.js               # Centralized Environment config & validation
-│   │   ├── ingestion/
-│   │   │   ├── leads.js             # Zoho Leads Dynamic Module Extraction
-│   │   │   └── deals.js             # Zoho Deals Ingestion logic
-│   │   ├── scheduler/
-│   │   │   └── index.js             # Main Orchestrator: Sync → SQL → AI → WhatsApp
-│   │   ├── utils/
-│   │   │   ├── schema.sql           # Database schema definitions (JSONB ELT)
-│   │   │   └── supabaseClient.js    # Supabase (PostgreSQL) Client adapter
-│   │   └── whatsapp/
-│   │       └── twilioClient.js      # Twilio WhatsApp Dispatcher
-│   ├── package.json                 # Backend dependencies & pipeline scripts
-│   └── .env                         # Sensitive configuration (NOT committed)
-└── dashboard.py                     # Premium Streamlit Dashboard (15+ Charts)
-```
+### 1. Prerequisites
+- **Node.js** (v18+)
+- **Ollama** running locally with the `llama3.2:1b` model (`ollama run llama3.2:1b`)
+- **Supabase** account and project
+- **Zoho CRM** account with API access
+- **Twilio** account for WhatsApp delivery
 
----
-
-## ⚙️ Setup & Installation
-
-### Prerequisites
-- **Python 3.10+**
-- **[Ollama](https://ollama.com/)** with `llama3.2:1b` pulled locally
-- A **Zoho CRM** account with API credentials
-- A **Supabase** project
-- A **Twilio** account with WhatsApp Sandbox enabled
-
-### 1. Install Dependencies
+### 2. Installation
+Clone the repository and install dependencies in the backend:
 ```bash
-# Install Python dependencies
-pip install streamlit pandas plotly supabase requests python-dotenv
-
-# Install Node.js backend dependencies
 cd backend
 npm install
 ```
 
-### 2. Configure Environment Variables
-Create a `.env` file in the `backend/` directory with your Zoho, Supabase, and Twilio credentials.
+### 3. Environment Variables
+Create a `.env` file in the `backend/` directory with the following configuration:
+```env
+# Zoho CRM Credentials
+ZOHO_CLIENT_ID=your_id
+ZOHO_CLIENT_SECRET=your_secret
+ZOHO_REFRESH_TOKEN=your_refresh
 
-### 3. Apply Database Schema
-Open your Supabase project → SQL Editor → paste the contents of `backend/src/utils/schema.sql` → click **Run**.
+# Supabase Credentials
+SUPABASE_URL=your_supabase_url
+SUPABASE_SERVICE_KEY=your_service_key
+
+# Local AI Configuration
+OLLAMA_BASE_URL=http://localhost:11434
+
+# Twilio WhatsApp Credentials
+TWILIO_ACCOUNT_SID=your_sid
+TWILIO_AUTH_TOKEN=your_token
+TWILIO_FROM_NUMBER=whatsapp:+14155238886
+RECIPIENT_PHONE_NUMBER=your_whatsapp_number
+```
+
+### 4. Database Setup
+Execute the schema provided in `backend/src/utils/schema.sql` (if available) within your Supabase SQL editor to initialize the required tables (`leads`, `deals`, `sync_state`, `ai_summaries`).
+
+### 5. Running the System
+The system can be started from the root directory or directly from the backend.
+
+**Start the API Server:**
+```bash
+cd backend
+npm run start:backend
+# or from root: npm start
+```
+
+**Run the Data Pipeline Manually:**
+```bash
+cd backend
+npm run start:pipeline
+```
 
 ---
 
-## 🚀 Running the System
+## 📂 File Structure
 
-| Mode | Command | Description |
-| :--- | :--- | :--- |
-| **Backend API** | `npm run start:api` | Handles WhatsApp webhooks & triggers |
-| **Dashboard** | `streamlit run dashboard.py` | Launches the live UI |
-| **Manual Sync** | `npm run start:pipeline` | Triggers a fresh data & AI run |
+### Root Directory
+- `backend/`: Core logic and API server.
+- `package.json`: Root runner configuration.
+- `README.md`: System documentation.
+
+### Backend Structure (`backend/src/`)
+- `ai/`: AI analysis service using Ollama and Llama 3.2.
+- `analytics/`: Service for calculating KPIs and SQL aggregations.
+- `api/`: Express.js server and API route definitions.
+- `auth/`: OAuth2 handling for Zoho CRM.
+- `config/`: Centralized configuration and environment loading.
+- `ingestion/`: Logic for fetching and upserting CRM data.
+- `scheduler/`: Cron job for automated daily execution.
+- `utils/`: Common helpers, database clients, and SQL schemas.
+- `whatsapp/`: Twilio integration for automated summary broadcasts.
 
 ---
 
-## 🛠️ Tech Stack & Decisions
-
-### Core Infrastructure
-- **CRM**: Zoho CRM API v2 for reliable data extraction.
-- **Data Engine**: Supabase (PostgreSQL) with ELT pattern for maximum scalability.
-- **AI Brain**: Llama 3.2 running locally—zero latency, zero cost.
-- **UI**: Streamlit with custom "Vibrant Midnight" CSS for a premium feel.
-
-> [!IMPORTANT]
-> **Privacy First**: All AI analysis is performed 100% locally on your machine. No CRM data ever leaves your infrastructure for processing.
+## 🧠 Design Philosophy
+The system prioritizes **data security** and **predictability**:
+- **Local AI**: All lead and revenue data is processed locally via Ollama, ensuring sensitive information never leaves your infrastructure.
+- **Strict Schema Forcing**: The AI is prompted to return structured JSON, ensuring the output is always deterministic and stable for API consumption.
+- **Incremental Sync**: Only modified CRM records are fetched, minimizing API usage and database load.
