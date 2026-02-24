@@ -151,17 +151,7 @@ This system isn't just a data bridge; it's a **context engine**.
 - **Strategic Persona**: The AI is prompted as a Chief Revenue Officer. Instead of saying "Leads are up by 10%," it says, "We have a 10% surge in Facebook leads, but conversion velocity is slowing—recommend re-allocating budget to High-Value Deals."
 - **Daily Pulse**: The WhatsApp summary is limited to 400 characters, forcing the AI to provide only the "Critical Gap" and "Immediate Action," respecting the executive's time.
 
----
 
-## 📸 Sample Outputs
-
-### 🏢 Executive Dashboard
-![Executive Dashboard](file:///Users/patrick/.gemini/antigravity/brain/4ec07683-150c-4cc1-97cc-9f71940839d7/dashboard_full_view_after_sync_1771870255607.png)
-
-### 🧠 AI Strategic Briefing
-![AI Insights](file:///Users/patrick/.gemini/antigravity/brain/4ec07683-150c-4cc1-97cc-9f71940839d7/ai_executive_insights_section_1771870587283.png)
-
----
 
 > [!IMPORTANT]
 > **Privacy First**: All AI analysis is performed 100% locally on your machine. No CRM data ever leaves your infrastructure for processing.
