@@ -125,14 +125,32 @@ def fetch_filtered_data(range_label):
     start_utc, end_utc = get_date_range(range_label)
     
     leads_q = client.table("crm_leads").select("lead_id,owner_name,status,source,is_converted,created_time")
-    deals_q = client.table("crm_deals").select("deal_id,lead_id,deal_name,owner_name,stage,source,amount,created_time")
+    deals_q = client.table("crm_deals").select("deal_id,lead_id,deal_name,owner_name,stage,source,amount,created_time,modified_time,closed_time")
     
-    if start_utc:
-        leads_q = leads_q.gte("created_time", start_utc)
-        deals_q = deals_q.gte("created_time", start_utc)
-    if end_utc:
-        leads_q = leads_q.lt("created_time", end_utc)
-        deals_q = deals_q.lt("created_time", end_utc)
+    if range_label == "All Time":
+        # No filter needed
+        pass
+    else:
+        # Leads: Filter by creation
+        if start_utc: leads_q = leads_q.gte("created_time", start_utc)
+        if end_utc: leads_q = leads_q.lt("created_time", end_utc)
+        
+        # Deals: Filter by created, modified, OR closed
+        if start_utc:
+            # Complex OR filter: was it created, modified, or closed in this period?
+            # Note: We use .or_() or a string filter for Postgrest
+            # Correct syntax for supabase-py: .or_(f"created_time.gte.{start_utc},modified_time.gte.{start_utc},closed_time.gte.{start_utc}")
+            or_filter = f"created_time.gte.{start_utc},modified_time.gte.{start_utc},closed_time.gte.{start_utc}"
+            if end_utc:
+                # If we have an end date (e.g. Yesterday), we need to ensure they are also BEFORE the end of that period
+                # This is tricky with OR + AND in a single .or_ call. 
+                # Alternative: Fetch a bit more and filter in Pandas if the dataset is small, 
+                # OR use several .or_ or a raw filter.
+                # Since we want "What happened in this window", any deal modified since start is a good candidate.
+                deals_q = deals_q.or_(or_filter)
+                # We'll refine the end-date filtering in Pandas to be safe.
+            else:
+                deals_q = deals_q.or_(or_filter)
         
     leads_res = leads_q.execute()
     deals_res = deals_q.execute()
@@ -173,14 +191,40 @@ st.divider()
 try:
     with st.spinner(f"⚡ Fetching {date_range} Pipeline..."):
         leads, deals, metrics, ai_table = fetch_filtered_data(date_range)
-
-        # Convert UTC strings to IST datetimes for local chart plotting
+        
+        # Define Filter Boundaries
+        start_utc, end_utc = get_date_range(date_range)
+        
+        # Convert UTC strings to IST datetimes
         if not leads.empty:
             leads["created_time"] = pd.to_datetime(leads["created_time"]).dt.tz_convert(IST)
         if not deals.empty:
             deals["created_time"] = pd.to_datetime(deals["created_time"]).dt.tz_convert(IST)
+            deals["modified_time"] = pd.to_datetime(deals["modified_time"]).dt.tz_convert(IST)
+            deals["closed_time"] = pd.to_datetime(deals["closed_time"]).dt.tz_convert(IST)
             deals["stage"] = deals["stage"].astype(str)
             deals["amount"] = pd.to_numeric(deals["amount"], errors="coerce").fillna(0)
+
+        # Apply Global Filter
+        if date_range != "All Time":
+            if start_utc:
+                st_ts = pd.to_datetime(start_utc).tz_convert(IST)
+                leads = leads[leads["created_time"] >= st_ts]
+                deals = deals[
+                    (deals["created_time"] >= st_ts) | 
+                    (deals["modified_time"] >= st_ts) |
+                    (deals["closed_time"] >= st_ts)
+                ]
+            if end_utc:
+                en_ts = pd.to_datetime(end_utc).tz_convert(IST)
+                leads = leads[leads["created_time"] < en_ts]
+                deals = deals[
+                    (deals["created_time"] < en_ts) & 
+                    (
+                        (deals["modified_time"] < en_ts) |
+                        (deals["closed_time"] < en_ts)
+                    )
+                ]
 except Exception as e:
     st.error(f"📡 Connection Timeout: Supabase is taking too long to respond. {str(e)}")
     st.warning("🔄 Please check your internet connection or try clicking the Sync button above.")
@@ -219,7 +263,7 @@ with tab_today:
         t_prop    = safe_i(m.get("proposals_sent", 0))
         avg_deal  = (rev_won / t_won) if t_won > 0 else 0
     else:
-        # Calculate from current filtered dataframes
+        # Calculate from already globally-filtered leads/deals
         won_deals = deals[deals["stage"].str.contains("closed won", case=False, na=False)] if not deals.empty else pd.DataFrame()
         lost_deals = deals[deals["stage"].str.contains("closed lost", case=False, na=False)] if not deals.empty else pd.DataFrame()
         
@@ -227,10 +271,10 @@ with tab_today:
         t_won     = len(won_deals)
         rev_won   = won_deals["amount"].sum() if not won_deals.empty else 0
         rev_lost  = lost_deals["amount"].sum() if not lost_deals.empty else 0
-        t_rev     = rev_won + rev_lost # Total "touched" this period
+        t_rev     = deals["amount"].sum() if not deals.empty else 0 # Total Volume touched
         win_rate  = (rev_won / (rev_won + rev_lost) * 100) if (rev_won + rev_lost) > 0 else 0
         t_nego    = len(deals[deals["stage"].str.contains("negotiation", case=False, na=False)]) if not deals.empty else 0
-        t_prop    = len(deals[deals["stage"].str.contains("proposal", case=False, na=False)]) if not deals.empty else 0
+        t_prop    = len(deals[deals["stage"].str.contains("proposal|quote", case=False, na=False)]) if not deals.empty else 0
         avg_deal  = (rev_won / t_won) if t_won > 0 else 0
 
     st.markdown(f"#### ⚡ {date_range} Performance")
