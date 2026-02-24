@@ -260,6 +260,47 @@ if not leads.empty:
     )
     st.plotly_chart(fig, use_container_width=True)
 
+# =====================================================
+# OPERATIONAL LEAK DETECTOR
+# =====================================================
+st.markdown(
+    "### 🕵️‍♂️ Operational Leak Detector "
+    "<span style='font-size:14px;color:#94a3b8;'>(Conversion Health)</span>",
+    unsafe_allow_html=True
+)
+
+if not leads.empty:
+    total_leads = len(leads)
+    converted_leads = leads["is_converted"].sum()
+    
+    active_deals = 0
+    won_deals = 0
+    
+    if not deals.empty:
+        active_deals = len(deals[~deals["stage"].str.contains("closed", case=False)])
+        won_deals = len(deals[deals["stage"].str.contains("closed won", case=False)])
+
+    leak_data = pd.DataFrame({
+        "Stage": ["Total Leads", "Converted Leads", "Active Deals", "Won Deals"],
+        "Count": [total_leads, converted_leads, active_deals, won_deals]
+    })
+
+    fig = px.funnel(
+        leak_data,
+        x="Count",
+        y="Stage",
+        color_discrete_sequence=[ACCENT],
+        template="plotly_dark"
+    )
+
+    fig.update_layout(
+        plot_bgcolor="rgba(0,0,0,0)",
+        paper_bgcolor="rgba(0,0,0,0)",
+        margin=dict(t=10, b=10)
+    )
+    
+    st.plotly_chart(fig, use_container_width=True)
+
 st.divider()
 
 # =====================================================
