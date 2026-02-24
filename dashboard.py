@@ -329,8 +329,7 @@ if not deals.empty:
         pipeline,
         y="stage",
         x="Deals",
-        color="Revenue",
-        color_continuous_scale=[[0,CARD],[1,SUCCESS]],
+        color_discrete_sequence=[SUCCESS],
         template="plotly_dark"
     )
 
