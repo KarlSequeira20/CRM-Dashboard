@@ -10,16 +10,6 @@ A fully automated, production-grade CRM intelligence system that pulls all data 
 
 ---
 
-## ✨ Key Features
-
-- **🚀 Real-Time Dashboard**: 15+ dynamic Plotly charts with zero-cache latency for critical KPIs.
-- **🧠 Local AI Analyst**: Private, on-device strategic briefings via Ollama (Llama 3.2).
-- **📱 WhatsApp Strategic Pulse**: 3-point mobile briefings (Metrics, Signals, Focus) sent daily.
-- **💬 Interactive Commands**: Type `UPDATE` in WhatsApp to trigger an on-demand sync and briefing.
-- **📊 JSONB ELT Pattern**: Dynamic module extraction ensuring no data is ever lost.
-
----
-
 ## 🏗️ System Architecture
 
 ```mermaid
