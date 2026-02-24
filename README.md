@@ -116,13 +116,52 @@ Open your Supabase project → SQL Editor → paste the contents of `backend/src
 
 ---
 
-## 🛠️ Tech Stack & Decisions
+## 🛠️ Tech Stack & Design Justification
 
 ### Core Infrastructure
-- **CRM**: Zoho CRM API v2 for reliable data extraction.
-- **Data Engine**: Supabase (PostgreSQL) with ELT pattern for maximum scalability.
-- **AI Brain**: Llama 3.2 running locally—zero latency, zero cost.
-- **UI**: Streamlit with custom "Vibrant Midnight" CSS for a premium feel.
+- **Node.js (Backend)**: Chosen for its asynchronous non-blocking I/O, ideal for orchestrating multiple API calls (Zoho, Supabase, Twilio) and handling concurrent WhatsApp webhooks.
+- **Python/Streamlit (Frontend)**: Selected for rapid iteration of data-heavy dashboards. Streamlit's ecosystem allows for professional Plotly integration with minimal boilerplate.
+- **Supabase (PostgreSQL + JSONB)**: 
+    - **PostgreSQL**: Robust relational support for structured metrics (CRM Deals, Contacts).
+    - **JSONB**: Utilized for the **ELT (Extract, Load, Transform) pattern**. Storing raw CRM data in JSONB ensures zero data loss during sync, even if Zoho adds custom fields later.
+- **Ollama / Llama 3.2**: 
+    - **Choice**: Open-source local LLM over OpenAI.
+    - **Justification**: 100% data privacy (no sensitive lead info leaves the machine) and $0 inference cost.
+- **Twilio WhatsApp API**: Industry standard for reliable, high-deliverability mobile alerts.
+
+---
+
+## 🏗️ Design Decisions & Trade-offs
+
+1. **SQL Math vs. LLM Math**: 
+    - *Decision*: All funnel calculations (Lead-to-Won rates, Total Revenue) are performed in the PostgreSQL layer using complex SQL aggregations. 
+    - *Rationale*: LLMs are prone to "hallucinations" when performing arithmetic. Offloading math to SQL ensures 100% accurate KPIs, allowing the AI to focus on **qualitative strategy**.
+2. **Synchronous Dashboard Refresh**: 
+    - *Decision*: The Streamlit "Refresh" button triggers a synchronous backend pipeline.
+    - *Trade-off*: While slower than an async trigger, it provides the executive with immediate feedback and a guaranteed "Success" state once the UI updates.
+3. **Immutability in Sync**: 
+    - *Decision*: We use a `sync_logs` table to track every fetch.
+    - *Rationale*: Provides a reliable audit trail for debugging Zoho API issues and ensures idempotency during incremental syncs.
+
+---
+
+## 🧠 Product Thinking: The "CRO Persona"
+
+This system isn't just a data bridge; it's a **context engine**. 
+- **Strategic Persona**: The AI is prompted as a Chief Revenue Officer. Instead of saying "Leads are up by 10%," it says, "We have a 10% surge in Facebook leads, but conversion velocity is slowing—recommend re-allocating budget to High-Value Deals."
+- **Daily Pulse**: The WhatsApp summary is limited to 400 characters, forcing the AI to provide only the "Critical Gap" and "Immediate Action," respecting the executive's time.
+
+---
+
+## 📸 Sample Outputs
+
+### 🏢 Executive Dashboard
+![Executive Dashboard](file:///Users/patrick/.gemini/antigravity/brain/4ec07683-150c-4cc1-97cc-9f71940839d7/dashboard_full_view_after_sync_1771870255607.png)
+
+### 🧠 AI Strategic Briefing
+![AI Insights](file:///Users/patrick/.gemini/antigravity/brain/4ec07683-150c-4cc1-97cc-9f71940839d7/ai_executive_insights_section_1771870587283.png)
+
+---
 
 > [!IMPORTANT]
 > **Privacy First**: All AI analysis is performed 100% locally on your machine. No CRM data ever leaves your infrastructure for processing.
