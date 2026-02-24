@@ -66,7 +66,7 @@ def get_client():
         os.environ["SUPABASE_SERVICE_KEY"]
     )
 
-@st.cache_data(ttl=600)
+@st.cache_data(ttl=60)
 def fetch_table(table):
     return pd.DataFrame(
         get_client().table(table).select("*").execute().data
@@ -407,6 +407,9 @@ if not ai_summary.empty:
                 border-radius:18px;
                 border:1px solid {BORDER};
                 line-height:1.7;">
+    <div style="font-size:12px;color:#94a3b8;margin-bottom:12px;">
+        📅 Insight Generated: {latest['created_at']}
+    </div>
     {summary}
     </div>
     """, unsafe_allow_html=True)
