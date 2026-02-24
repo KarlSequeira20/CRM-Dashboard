@@ -45,7 +45,10 @@ export async function syncLeads() {
         is_converted: l.Is_Converted || false
     }));
 
-    const { error } = await supabase.from('crm_leads').upsert(records, { onConflict: 'lead_id' });
+    // De-duplicate records by lead_id to prevent "ON CONFLICT DO UPDATE command cannot affect row a second time"
+    const uniqueRecords = Array.from(new Map(records.map(r => [r.lead_id, r])).values());
+
+    const { error } = await supabase.from('crm_leads').upsert(uniqueRecords, { onConflict: 'lead_id' });
     if (error) throw new Error(`Failed to upsert Leads: ${error.message}`);
 
     const maxModified = [...leads].sort((a, b) => new Date(b.Modified_Time).getTime() - new Date(a.Modified_Time).getTime())[0].Modified_Time;
@@ -73,7 +76,10 @@ export async function syncDeals() {
         closed_time: (d.Stage && d.Stage.includes('Closed')) ? d.Modified_Time : null
     }));
 
-    const { error } = await supabase.from('crm_deals').upsert(records, { onConflict: 'deal_id' });
+    // De-duplicate records by deal_id to prevent database conflict errors
+    const uniqueRecords = Array.from(new Map(records.map(r => [r.deal_id, r])).values());
+
+    const { error } = await supabase.from('crm_deals').upsert(uniqueRecords, { onConflict: 'deal_id' });
     if (error) throw new Error(`Failed to upsert Deals: ${error.message}`);
 
     const maxModified = [...deals].sort((a, b) => new Date(b.Modified_Time).getTime() - new Date(a.Modified_Time).getTime())[0].Modified_Time;

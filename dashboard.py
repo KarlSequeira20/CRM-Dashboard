@@ -9,6 +9,7 @@ import os
 import requests
 from dotenv import load_dotenv
 from datetime import datetime, timedelta, timezone
+import json
 
 # Silence Pandas downcasting warning
 pd.set_option('future.no_silent_downcasting', True)
@@ -122,54 +123,40 @@ def get_date_range(option):
     end_utc = end.astimezone(timezone.utc).isoformat() if end else None
     return start_utc, end_utc
 
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=30)
 def fetch_filtered_data(range_label):
-    client = get_client()
-    url = os.environ.get("SUPABASE_URL")
-    
-    # Fast Connectivity Check to avoid 60s hangs if network is totally down
-    try:
-        requests.get(url, timeout=5)
-    except Exception as e:
-        raise ConnectionError(f"Could not reach Supabase API at {url}. Please check your internet connection or VPN. Details: {str(e)}")
-
+    url = "http://localhost:3001/api/dashboard/data"
     start_utc, end_utc = get_date_range(range_label)
     
-    leads_q = client.table("crm_leads").select("lead_id,owner_name,status,source,is_converted,created_time")
-    deals_q = client.table("crm_deals").select("deal_id,lead_id,deal_name,owner_name,stage,source,amount,created_time,modified_time,closed_time")
-    
-    if range_label == "All Time":
-        # No filter needed
-        pass
-    else:
-        # Leads: Filter by creation
-        if start_utc: leads_q = leads_q.gte("created_time", start_utc)
-        if end_utc: leads_q = leads_q.lt("created_time", end_utc)
-        
-        # Deals: Filter by created, modified, OR closed
-        if start_utc:
-            # Complex OR filter: was it created, modified, or closed in this period?
-            # Note: We use .or_() or a string filter for Postgrest
-            # Correct syntax for supabase-py: .or_(f"created_time.gte.{start_utc},modified_time.gte.{start_utc},closed_time.gte.{start_utc}")
-            or_filter = f"created_time.gte.{start_utc},modified_time.gte.{start_utc},closed_time.gte.{start_utc}"
-            if end_utc:
-                # If we have an end date (e.g. Yesterday), we need to ensure they are also BEFORE the end of that period
-                # This is tricky with OR + AND in a single .or_ call. 
-                # Alternative: Fetch a bit more and filter in Pandas if the dataset is small, 
-                # OR use several .or_ or a raw filter.
-                # Since we want "What happened in this window", any deal modified since start is a good candidate.
-                deals_q = deals_q.or_(or_filter)
-                # We'll refine the end-date filtering in Pandas to be safe.
-            else:
-                deals_q = deals_q.or_(or_filter)
-        
-    leads_res = leads_q.execute()
-    deals_res = deals_q.execute()
-    
-    metrics_res = client.table("daily_metrics_summary").select("*").limit(1).execute()
-    ai_res = client.table("ai_summaries").select("id,payload,created_at").order("created_at", desc=True).limit(1).execute()
+    # Snapshot path for emergency fallback if backend is down
+    snapshot_path = os.path.join(os.path.dirname(__file__), 'backend', 'data_snapshot.json')
 
-    return pd.DataFrame(leads_res.data), pd.DataFrame(deals_res.data), pd.DataFrame(metrics_res.data), pd.DataFrame(ai_res.data)
+    try:
+        # 1. Try fetching from Backend Proxy
+        params = {"range_label": range_label, "start_utc": start_utc, "end_utc": end_utc}
+        res = requests.get(url, params=params, timeout=10)
+        res.raise_for_status()
+        data = res.json()
+        return (
+            pd.DataFrame(data.get("leads", [])),
+            pd.DataFrame(data.get("deals", [])),
+            pd.DataFrame(data.get("metrics", [])),
+            pd.DataFrame(data.get("ai_table", [])),
+            data.get("source", "live")
+        )
+    except Exception as e:
+        # 2. Fallback to Local Snapshot if backend/network is unreachable
+        if os.path.exists(snapshot_path):
+            with open(snapshot_path, 'r') as f:
+                data = json.load(f)
+            return (
+                pd.DataFrame(data.get("leads", [])),
+                pd.DataFrame(data.get("deals", [])),
+                pd.DataFrame(data.get("metrics", [])),
+                pd.DataFrame(data.get("ai_table", [])),
+                "cache"
+            )
+        raise ConnectionError(f"Backend unreachable and no local cache found. {str(e)}")
 
 def refresh():
     st.cache_data.clear()
@@ -201,7 +188,10 @@ st.divider()
 # =====================================================
 try:
     with st.spinner(f"⚡ Fetching {date_range} Pipeline..."):
-        leads, deals, metrics, ai_table = fetch_filtered_data(date_range)
+        leads, deals, metrics, ai_table, data_source = fetch_filtered_data(date_range)
+        
+        if data_source == "cache":
+            st.warning("📡 Offline Mode: Displaying last successful data snapshot (Supabase unreachable).")
         
         # Define Filter Boundaries
         start_utc, end_utc = get_date_range(date_range)

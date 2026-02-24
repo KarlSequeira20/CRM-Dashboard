@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import { supabase } from '../utils/supabaseClient.js';
 import aiRoutes from './aiRoutes.js';
+import dashboardRoutes from './dashboardRoutes.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -17,6 +18,7 @@ app.get('/api/health', (req, res) => {
 
 // Load feature routes
 app.use('/api/ai', aiRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 
 app.listen(PORT, () => {
     console.log(`[API Server] Running on http://localhost:${PORT}`);
