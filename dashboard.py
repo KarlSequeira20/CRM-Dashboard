@@ -14,6 +14,23 @@ import json
 # Silence Pandas downcasting warning
 pd.set_option('future.no_silent_downcasting', True)
 
+def human_format(num, is_currency=False):
+    if num is None: return "0"
+    prefix = "₹ " if is_currency else ""
+    
+    magnitude = 0
+    while abs(num) >= 1000 and magnitude < 4:
+        magnitude += 1
+        num /= 1000.0
+    
+    suffix = ['', 'k', 'M', 'B', 'T'][magnitude]
+    
+    if magnitude == 0:
+        return f"{prefix}{int(num):,}" if num % 1 == 0 else f"{prefix}{num:,.2f}"
+    
+    # 1.2k, 15.4M, etc.
+    return f"{prefix}{num:.1f}{suffix}"
+
 # =====================================================
 # CONFIG & STYLING
 # =====================================================
@@ -284,20 +301,20 @@ with tab_today:
 
     st.markdown(f"#### ⚡ {date_range} Performance")
     k1, k2, k3, k4, k5 = st.columns(5)
-    k1.metric("🆕 New Leads",           f"{t_leads:,}")
-    k2.metric("🤝 Active Negotiations",  f"{t_nego:,}")
-    k3.metric("🏆 Deals Won",           f"{t_won:,}")
-    k4.metric("💰 Revenue Won",         f"₹ {rev_won:,.0f}")
-    k5.metric("📉 Revenue Lost",        f"₹ {rev_lost:,.0f}")
+    k1.metric("🆕 New Leads",           human_format(t_leads))
+    k2.metric("🤝 Active Negotiations",  human_format(t_nego))
+    k3.metric("🏆 Deals Won",           human_format(t_won))
+    k4.metric("💰 Revenue Won",         human_format(rev_won, True))
+    k5.metric("📉 Revenue Lost",        human_format(rev_lost, True))
 
     st.divider()
 
     st.markdown("#### 🏁 Period Outcomes")
     d1, d2, d3, d4 = st.columns(4)
-    d1.metric("💵 Revenue Touched",      f"₹ {t_rev:,.0f}")
+    d1.metric("💵 Revenue Touched",      human_format(t_rev, True))
     d2.metric("📊 Period Win Rate",      f"{win_rate:.1f}%")
-    d3.metric("📄 Proposals Sent",       f"{t_prop:,}")
-    d4.metric("🎯 Avg Deal Size",        f"₹ {avg_deal:,.0f}")
+    d3.metric("📄 Proposals Sent",       human_format(t_prop))
+    d4.metric("🎯 Avg Deal Size",        human_format(avg_deal, True))
 
     st.divider()
 
@@ -305,10 +322,10 @@ with tab_today:
         m = metrics.iloc[0]
         st.markdown("#### 🗓️ Today's Lifecycle Activity *(from daily sync)*")
         l1, l2, l3, l4, l5 = st.columns(5)
-        l1.metric("📞 Contacted",      safe_i(m.get("leads_contacted", 0)))
-        l2.metric("⭐ Qualified",      safe_i(m.get("qualified_leads", 0)))
-        l3.metric("📅 Demo Sched.",    safe_i(m.get("demos_scheduled", 0)))
-        l4.metric("🖥️ Demo Held",      safe_i(m.get("demos_held", 0)))
+        l1.metric("📞 Contacted",      human_format(safe_i(m.get("leads_contacted", 0))))
+        l2.metric("⭐ Qualified",      human_format(safe_i(m.get("qualified_leads", 0))))
+        l3.metric("📅 Demo Sched.",    human_format(safe_i(m.get("demos_scheduled", 0))))
+        l4.metric("🖥️ Demo Held",      human_format(safe_i(m.get("demos_held", 0))))
         l5.metric("⏱️ Last Synced",    str(m.get("updated_at","—"))[:16].replace("T"," "))
 
 
@@ -380,7 +397,8 @@ with tab_pipeline:
                 fig = px.bar(
                     team, x="owner_name", y=["Touched", "Won"],
                     barmode="group",
-                    color_discrete_map={"Touched": SECONDARY, "Won": SUCCESS}
+                    color_discrete_map={"Touched": SECONDARY, "Won": SUCCESS},
+                    text_auto='.2s'
                 )
                 fig.update_layout(legend=dict(orientation="h", y=1.1, x=0, title=""))
                 st.plotly_chart(chart_layout(fig), width="stretch")
@@ -394,8 +412,10 @@ with tab_pipeline:
                 fig = px.bar(
                     pv, x="amount", y="stage", orientation="h",
                     color="amount",
-                    color_continuous_scale=[[0, SECONDARY], [0.5, PRIMARY], [1, CYAN]]
+                    color_continuous_scale=[[0, SECONDARY], [0.5, PRIMARY], [1, CYAN]],
+                    text=pv["amount"].apply(lambda x: human_format(x, True))
                 )
+                fig.update_traces(textposition='outside')
                 fig.update_coloraxes(showscale=False)
                 st.plotly_chart(chart_layout(fig), width="stretch")
             else:
@@ -440,7 +460,7 @@ with tab_pipeline:
                     </div>
                     <div style="text-align:right;">
                         <p style="margin:0 0 6px 0; font-size:1.05rem; font-weight:700; color:{SUCCESS};">
-                            ₹ {row["amount"]:,.0f}
+                            {human_format(row["amount"], True)}
                         </p>
                         <span style="background:{badge_color}15; color:{badge_color};
                                      font-size:0.7rem; font-weight:700; letter-spacing:0.05em;
