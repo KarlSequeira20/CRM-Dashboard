@@ -296,28 +296,41 @@ if not leads.empty:
     st.plotly_chart(fig, use_container_width=True)
 
 # =====================================================
-# SALES PIPELINE
+# CONVERSION FUNNEL
 # =====================================================
-st.subheader("📊 Sales Pipeline Overview")
+st.subheader("📊 Conversion Funnel")
 
 if not deals.empty:
+    # Sort stages in a logical sales order
+    stage_order = [
+        "Qualification", 
+        "Needs Analysis", 
+        "Value Proposition", 
+        "Id. Decision Makers", 
+        "Proposal/Price Quote", 
+        "Negotiation/Review", 
+        "Closed Won"
+    ]
+    
     pipeline = (
         deals.groupby("stage")
         .agg(Deals=("deal_id","count"),
-             Revenue=("amount","sum"),
-             Avg=("amount","mean"))
+             Revenue=("amount","sum"))
         .reset_index()
-        .sort_values("Deals",ascending=False)
     )
+    
+    # Filter to only including known stages for a clean funnel, or just sort them
+    pipeline["stage_idx"] = pipeline["stage"].apply(
+        lambda x: stage_order.index(x) if x in stage_order else 99
+    )
+    pipeline = pipeline.sort_values("stage_idx")
 
-    fig = px.bar(
+    fig = px.funnel(
         pipeline,
         y="stage",
-        x="Revenue",
-        orientation="h",
-        text="Deals",
+        x="Deals",
         color="Revenue",
-        color_continuous_scale=[[0,CARD],[1,PRIMARY]],
+        color_continuous_scale=[[0,CARD],[1,SUCCESS]],
         template="plotly_dark"
     )
 
@@ -325,13 +338,13 @@ if not deals.empty:
         plot_bgcolor="rgba(0,0,0,0)",
         paper_bgcolor="rgba(0,0,0,0)",
         coloraxis_showscale=False,
-        yaxis=dict(title=""),
-        xaxis=dict(title="")
+        yaxis=dict(title="")
     )
 
     fig.update_traces(
-        texttemplate="%{text} deals",
-        hovertemplate="Stage: %{y}<br>Deals: %{text}<br>Revenue: ₹ %{x:,.0f}"
+        textinfo="value+percent initial",
+        hovertemplate="Stage: %{y}<br>Deals: %{x}<br>Revenue: ₹ %{customdata[0]:,.0f}",
+        customdata=pipeline[["Revenue"]]
     )
 
     st.plotly_chart(fig, use_container_width=True)
