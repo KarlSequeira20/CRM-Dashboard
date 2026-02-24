@@ -10,6 +10,9 @@ import requests
 from dotenv import load_dotenv
 from datetime import datetime, timedelta, timezone
 
+# Silence Pandas downcasting warning
+pd.set_option('future.no_silent_downcasting', True)
+
 # =====================================================
 # CONFIG & STYLING
 # =====================================================
@@ -122,6 +125,14 @@ def get_date_range(option):
 @st.cache_data(ttl=60)
 def fetch_filtered_data(range_label):
     client = get_client()
+    url = os.environ.get("SUPABASE_URL")
+    
+    # Fast Connectivity Check to avoid 60s hangs if network is totally down
+    try:
+        requests.get(url, timeout=5)
+    except Exception as e:
+        raise ConnectionError(f"Could not reach Supabase API at {url}. Please check your internet connection or VPN. Details: {str(e)}")
+
     start_utc, end_utc = get_date_range(range_label)
     
     leads_q = client.table("crm_leads").select("lead_id,owner_name,status,source,is_converted,created_time")
@@ -180,7 +191,7 @@ date_range = c2.selectbox(
     label_visibility="collapsed"
 )
 
-if c3.button("🔄 Sync AI / Cache", use_container_width=True):
+if c3.button("🔄 Sync AI / Cache", width="stretch"):
     refresh()
 
 st.divider()
@@ -197,18 +208,18 @@ try:
         
         # Convert UTC strings to IST datetimes
         if not leads.empty:
-            leads["created_time"] = pd.to_datetime(leads["created_time"]).dt.tz_convert(IST)
+            leads["created_time"] = pd.to_datetime(leads["created_time"], utc=True).dt.tz_convert(IST)
         if not deals.empty:
-            deals["created_time"] = pd.to_datetime(deals["created_time"]).dt.tz_convert(IST)
-            deals["modified_time"] = pd.to_datetime(deals["modified_time"]).dt.tz_convert(IST)
-            deals["closed_time"] = pd.to_datetime(deals["closed_time"]).dt.tz_convert(IST)
+            deals["created_time"] = pd.to_datetime(deals["created_time"], utc=True).dt.tz_convert(IST)
+            deals["modified_time"] = pd.to_datetime(deals["modified_time"], utc=True).dt.tz_convert(IST)
+            deals["closed_time"] = pd.to_datetime(deals["closed_time"], utc=True).dt.tz_convert(IST)
             deals["stage"] = deals["stage"].astype(str)
             deals["amount"] = pd.to_numeric(deals["amount"], errors="coerce").fillna(0)
 
         # Apply Global Filter
         if date_range != "All Time":
             if start_utc:
-                st_ts = pd.to_datetime(start_utc).tz_convert(IST)
+                st_ts = pd.to_datetime(start_utc, utc=True).tz_convert(IST)
                 leads = leads[leads["created_time"] >= st_ts]
                 deals = deals[
                     (deals["created_time"] >= st_ts) | 
@@ -216,7 +227,7 @@ try:
                     (deals["closed_time"] >= st_ts)
                 ]
             if end_utc:
-                en_ts = pd.to_datetime(end_utc).tz_convert(IST)
+                en_ts = pd.to_datetime(end_utc, utc=True).tz_convert(IST)
                 leads = leads[leads["created_time"] < en_ts]
                 deals = deals[
                     (deals["created_time"] < en_ts) & 
@@ -225,9 +236,13 @@ try:
                         (deals["closed_time"] < en_ts)
                     )
                 ]
+except ConnectionError as ce:
+    st.error(f"❌ Network Error: {str(ce)}")
+    st.info("� Tip: Try pinging your Supabase URL or checking if your VPN is blocking the connection.")
+    st.stop()
 except Exception as e:
-    st.error(f"📡 Connection Timeout: Supabase is taking too long to respond. {str(e)}")
-    st.warning("🔄 Please check your internet connection or try clicking the Sync button above.")
+    st.error(f"📡 API Error: Supabase is taking too long to respond or returned an error. {str(e)}")
+    st.warning("🔄 Please check your internet connection and ensure your Supabase project is active.")
     st.stop()
 
 # =====================================================
@@ -343,7 +358,7 @@ with tab_pipeline:
                 fig = px.area(hourly, x="hour", y="Leads", color_discrete_sequence=[PRIMARY])
                 fig.update_traces(fill="tozeroy", line=dict(color=PRIMARY, width=3), fillcolor="rgba(139,92,246,0.15)")
                 fig.update_xaxes(tickmode='linear', tick0=0, dtick=3, title="Hour of Day (IST)")
-                st.plotly_chart(chart_layout(fig), use_container_width=True)
+                st.plotly_chart(chart_layout(fig), width="stretch")
             else:
                 st.info(f"No leads generated during {date_range}.")
 
@@ -358,7 +373,7 @@ with tab_pipeline:
                 )
                 fig.update_traces(textfont_size=12, textinfo='percent', marker=dict(line=dict(color=BG, width=3)))
                 fig.update_layout(legend=dict(orientation="h", y=-0.15))
-                st.plotly_chart(chart_layout(fig), use_container_width=True)
+                st.plotly_chart(chart_layout(fig), width="stretch")
 
         st.divider()
 
@@ -371,14 +386,14 @@ with tab_pipeline:
                 t_total = deals.groupby("owner_name").size().reset_index(name="Touched")
                 t_won   = won_period.groupby("owner_name").size().reset_index(name="Won") if not won_period.empty else pd.DataFrame(columns=["owner_name", "Won"])
                 
-                team = t_total.merge(t_won, on="owner_name", how="left").fillna(0)
+                team = t_total.merge(t_won, on="owner_name", how="left").infer_objects(copy=False).fillna(0)
                 fig = px.bar(
                     team, x="owner_name", y=["Touched", "Won"],
                     barmode="group",
                     color_discrete_map={"Touched": SECONDARY, "Won": SUCCESS}
                 )
                 fig.update_layout(legend=dict(orientation="h", y=1.1, x=0, title=""))
-                st.plotly_chart(chart_layout(fig), use_container_width=True)
+                st.plotly_chart(chart_layout(fig), width="stretch")
             else:
                 st.info(f"No deal activity assigned for {date_range}.")
 
@@ -392,7 +407,7 @@ with tab_pipeline:
                     color_continuous_scale=[[0, SECONDARY], [0.5, PRIMARY], [1, CYAN]]
                 )
                 fig.update_coloraxes(showscale=False)
-                st.plotly_chart(chart_layout(fig), use_container_width=True)
+                st.plotly_chart(chart_layout(fig), width="stretch")
             else:
                 st.info(f"No deals in the pipeline for {date_range}.")
 
