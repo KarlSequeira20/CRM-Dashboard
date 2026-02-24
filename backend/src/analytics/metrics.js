@@ -97,21 +97,12 @@ export async function getFunnelMetrics() {
         .from('crm_leads')
         .select('*', { count: 'exact', head: true });
 
-    // 2. Converted Leads
-    const { count: convertedLeads, error: e1b } = await supabase
-        .from('crm_leads')
-        .select('*', { count: 'exact', head: true })
-        .eq('is_converted', true);
-
-    // 3. All Deals to aggregate stages
+    // 2. All Deals to aggregate stages
     const { data: deals, error: e2 } = await supabase
         .from('crm_deals')
         .select('stage');
 
-    if (e1 || e1b || e2) {
-        console.error('[Analytics] Error in getFunnelMetrics:', e1 || e1b || e2);
-        return [];
-    }
+    if (e1 || e2) return [];
 
     let contacted = 0;
     let qualified = 0;
@@ -155,26 +146,16 @@ export async function getFunnelMetrics() {
     const cumulativeQualified = qualified + cumulativeDemoSched;
     const cumulativeContacted = contacted; // Contacted is the top level for deals
 
-    const leakFunnel = [
-        { stage: "Total Leads", count: totalLeads || 0, color: "#6366f1" },
-        { stage: "Converted Leads", count: convertedLeads || 0, color: "#8b5cf6" },
-        { stage: "Active Deals", count: contacted, color: "#0ea5e9" },
+    return [
+        { stage: "New Leads", count: totalLeads || 0, color: "#6366f1" },
+        { stage: "Contacted", count: cumulativeContacted, color: "#0ea5e9" },
+        { stage: "Qualified", count: Math.max(cumulativeQualified, cumulativeDemoSched), color: "#06b6d4" },
+        { stage: "Demo Scheduled", count: cumulativeDemoSched, color: "#14b8a6" },
+        { stage: "Demo Done", count: cumulativeDemoDone, color: "#10b981" },
+        { stage: "Proposal Sent", count: cumulativeProposal, color: "#22c55e" },
+        { stage: "Negotiation", count: cumulativeNegotiation, color: "#84cc16" },
         { stage: "Won", count: cumulativeWon, color: "#f59e0b" }
     ];
-
-    return {
-        fullFunnel: [
-            { stage: "New Leads", count: totalLeads || 0, color: "#6366f1" },
-            { stage: "Contacted", count: cumulativeContacted, color: "#0ea5e9" },
-            { stage: "Qualified", count: Math.max(cumulativeQualified, cumulativeDemoSched), color: "#06b6d4" },
-            { stage: "Demo Scheduled", count: cumulativeDemoSched, color: "#14b8a6" },
-            { stage: "Demo Done", count: cumulativeDemoDone, color: "#10b981" },
-            { stage: "Proposal Sent", count: cumulativeProposal, color: "#22c55e" },
-            { stage: "Negotiation", count: cumulativeNegotiation, color: "#84cc16" },
-            { stage: "Won", count: cumulativeWon, color: "#f59e0b" }
-        ],
-        leakFunnel: leakFunnel
-    };
 }
 
 export async function getPipelineMetrics() {

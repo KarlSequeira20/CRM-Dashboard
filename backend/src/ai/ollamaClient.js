@@ -54,9 +54,8 @@ export async function generateInsights(jsonPayload) {
   }
 
   if (jsonPayload.funnel) {
-    englishData += `- Conversion Path: Total Leads(${jsonPayload.funnel.leads}) -> Converted(${jsonPayload.funnel.converted}) -> Active Deals(${jsonPayload.funnel.active_deals}) -> Won(${jsonPayload.funnel.won})\n`;
-    englishData += `- Lead-to-Deal Conversion: ${((jsonPayload.funnel.active_deals / jsonPayload.funnel.leads) * 100).toFixed(1)}%\n`;
-    englishData += `- Deal Win Rate: ${jsonPayload.funnel.conversion_rate}%\n`;
+    englishData += `- Funnel: Leads(${jsonPayload.funnel.leads}) -> Contacted(${jsonPayload.funnel.contacted}) -> Qualified(${jsonPayload.funnel.qualified}) -> Won(${jsonPayload.funnel.won})\n`;
+    englishData += `- Current Win Rate: ${jsonPayload.funnel.conversion_rate}%\n`;
   }
 
   if (jsonPayload.leads_by_source && jsonPayload.leads_by_source.length > 0) {
@@ -66,7 +65,7 @@ export async function generateInsights(jsonPayload) {
 
   const prompt = `
 Role: Strict Revenue Intelligence Analyst.
-Objective: Analyze the CRM metrics below to identify the "Operational Leak" (where the pipeline is stalling).
+Objective: Analyze the CRM metrics below and provide a detailed, high-stakes strategic briefing.
 
 DATA TO ANALYZE:
 ${englishData}
@@ -76,27 +75,27 @@ STRICT OUTPUT FORMAT:
 You MUST provide the following 5 sections. Be detailed but data-anchored.
 
 Primary Driver:
-[2-3 clear, informative sentences explaining the SINGLE BIGGEST LEAK or issue in the sales process.]
+[2-3 clear, informative sentences explaining the main issue or driver based ONLY on the data.]
 
 Supporting Evidence:
-- [Fact 1 about the biggest drop-off/leak with specific numbers]
-- [Fact 2 about conversion stall or pipeline health]
+- [Fact 1 with specific numbers/changes from the data]
+- [Fact 2 with specific numbers/changes from the data]
 
 Contradiction Check:
-[1-2 sentences explaining why other metrics do not contradict this leak identified.]
+[1-2 sentences explaining why other metrics do not contradict this driver, using the provided data.]
 
 Operational Impact:
-[2-3 clear sentences on how this leak directly affects bottom-line revenue or future growth.]
+[2-3 clear sentences on how this affects the business revenue or pipeline.]
 
 Immediate Diagnostic Actions:
-- [Diagnostic Step 1: Specific action to fix the identified leak]
-- [Diagnostic Step 2: Specific action to improve top-of-funnel or closing speed]
+- [Diagnostic Step 1: Specific to the data provided]
+- [Diagnostic Step 2: Specific to the data provided]
 
 RULES:
-1. IDENTIFY THE LEAK. Proactively call out if the stall is between Status->Deal or Stage->Won.
+1. NO EXTERNAL CITATIONS. Do not mention HubSpot, Salesforce, or external studies.
 2. NO FILLER. Start immediately with "Primary Driver:".
 3. ANCHOR TO DATA. Use the specific percentages and values from the metrics.
-4. MAX 1500 CHARACTERS.
+4. MAX 1400 CHARACTERS. Keep sentences extremely brief to ensure WhatsApp delivery.
 `.trim();
 
   // Force Ollama to return JSON (works with llama3.2+ when format="json" is passed)

@@ -6,7 +6,7 @@
 [![Twilio](https://img.shields.io/badge/Twilio-F22F46?style=for-the-badge&logo=Twilio&logoColor=white)](https://www.twilio.com/)
 [![Zoho](https://img.shields.io/badge/Zoho_CRM-EE2E24?style=for-the-badge&logo=zoho&logoColor=white)](https://www.zoho.com/crm/)
 
-A fully automated, production-grade CRM intelligence system that pulls all data from Zoho CRM across every module, stores it with zero data loss in a Supabase PostgreSQL cloud database, performs deep SQL analytics, and generates AI-driven executive insights using a private local Llama 3.2 model.
+A fully automated, production-grade CRM intelligence system that pulls all data from Zoho CRM across every module, stores it with zero data loss in a Supabase PostgreSQL cloud database, performs deep SQL analytics, and generates AI-driven executive insights using a private local Llama 3.2 model. Featuring a premium **Glassmorphism UI** with real-time trend intelligence.
 
 ---
 
@@ -74,7 +74,7 @@ AHA Smart Homes Project /
 │   │       └── twilioClient.js      # Twilio WhatsApp Dispatcher
 │   ├── package.json                 # Backend dependencies & pipeline scripts
 │   └── .env                         # Sensitive configuration (NOT committed)
-└── dashboard.py                     # Premium Streamlit Dashboard (15+ Charts)
+└── dashboard.py                     # Premium Glassmorphism Dashboard (Multi-tab layout)
 ```
 
 ---
@@ -120,7 +120,8 @@ Open your Supabase project → SQL Editor → paste the contents of `backend/src
 
 ### Core Infrastructure
 - **Node.js (Backend)**: Chosen for its asynchronous non-blocking I/O, ideal for orchestrating multiple API calls (Zoho, Supabase, Twilio) and handling concurrent WhatsApp webhooks.
-- **Python/Streamlit (Frontend)**: Selected for rapid iteration of data-heavy dashboards. Streamlit's ecosystem allows for professional Plotly integration with minimal boilerplate.
+- **Python/Streamlit (Frontend)**: Selected for rapid iteration of data-heavy dashboards. Enhanced with custom CSS for a **Premium Glassmorphism** look and fee.
+- **Multi-Tab Architecture**: The UI is divided into **Today's Strategic Pulse**, **Cumulative Pipeline**, and **AI Executive Insights** to streamline decision-making.
 - **Supabase (PostgreSQL + JSONB)**: 
     - **PostgreSQL**: Robust relational support for structured metrics (CRM Deals, Contacts).
     - **JSONB**: Utilized for the **ELT (Extract, Load, Transform) pattern**. Storing raw CRM data in JSONB ensures zero data loss during sync, even if Zoho adds custom fields later.
@@ -149,6 +150,7 @@ Open your Supabase project → SQL Editor → paste the contents of `backend/src
 
 This system isn't just a data bridge; it's a **context engine**. 
 - **Strategic Persona**: The AI is prompted as a Chief Revenue Officer. Instead of saying "Leads are up by 10%," it says, "We have a 10% surge in Facebook leads, but conversion velocity is slowing—recommend re-allocating budget to High-Value Deals."
+- **Trend Intelligence**: The system automatically calculates performance deltas (e.g., vs 7-day averages) and presents them as colored indicators (Deltas) for immediate pulse checking.
 - **Daily Pulse**: The WhatsApp summary is limited to 400 characters, forcing the AI to provide only the "Critical Gap" and "Immediate Action," respecting the executive's time.
 
 

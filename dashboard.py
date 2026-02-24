@@ -13,47 +13,70 @@ from datetime import datetime, timedelta
 # CONFIG
 # =====================================================
 st.set_page_config(
-    page_title="Aha CRM",
+    page_title="Aha CRM | Intelligence",
     page_icon="💠",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
 
-PRIMARY = "#8b5cf6"
-SUCCESS = "#10b981"
-ACCENT = "#f59e0b"
-DANGER = "#f43f5e"
-CYAN = "#06b6d4"
-
-BG = "#020617"
-CARD = "#0f172a"
+# Colors
+PRIMARY = "#8b5cf6" # Violet
+SECONDARY = "#6366f1" # Indigo
+SUCCESS = "#10b981" # Emerald
+ACCENT = "#f59e0b" # Amber
+DANGER = "#f43f5e" # Rose
+CYAN = "#06b6d4" # Cyan
+BG = "#020617" # Deep Navy
+CARD = "rgba(15, 23, 42, 0.7)" # Glassmorphism base
 BORDER = "rgba(255,255,255,0.08)"
-GRID = "rgba(255,255,255,0.05)"
+GRID = "rgba(255,255,255,0.03)"
 
 st.markdown(f"""
 <style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+
 .stApp {{ background-color: {BG}; }}
 html, body, [class*="st-"] {{
     font-family: 'Inter', sans-serif;
     color:#f1f5f9;
 }}
+
+/* Glassmorphism Cards */
 div[data-testid="stMetric"] {{
-    background:{CARD};
-    padding:26px!important;
-    border-radius:18px;
-    border:1px solid {BORDER};
+    background:{CARD}!important;
+    backdrop-filter: blur(12px);
+    padding: 24px!important;
+    border-radius: 16px;
+    border: 1px solid {BORDER};
+    box-shadow: 0 4px 24px -1px rgba(0, 0, 0, 0.2);
+    transition: all 0.3s ease;
 }}
 div[data-testid="stMetric"]:hover {{
-    border-color:{PRIMARY};
-    box-shadow:0 0 25px rgba(139,92,246,0.15);
+    border-color: {PRIMARY};
+    transform: translateY(-2px);
+    box-shadow: 0 10px 30px -5px rgba(139, 92, 246, 0.2);
 }}
-hr {{ border-top:1px solid {BORDER}; }}
+
+/* Sidebar and Header Hiding */
 #MainMenu, footer, header {{ visibility:hidden; }}
+
+/* Custom Header Gradient */
+.header-text {{
+    background: linear-gradient(90deg, #fff 0%, {PRIMARY} 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    font-weight: 700;
+}}
+
+/* Metrics Delta Styling */
+[data-testid="stMetricDelta"] > div {{
+    font-weight: 600;
+}}
 </style>
 """, unsafe_allow_html=True)
 
 # =====================================================
-# SUPABASE
+# SUPABASE & HELPERS
 # =====================================================
 def get_client():
     dotenv_path = os.path.join(os.path.dirname(__file__), 'backend', '.env')
@@ -68,40 +91,42 @@ def get_client():
 
 @st.cache_data(ttl=60)
 def fetch_table(table):
-    return pd.DataFrame(
-        get_client().table(table).select("*").execute().data
-    )
+    try:
+        data = get_client().table(table).select("*").execute().data
+        return pd.DataFrame(data)
+    except Exception as e:
+        st.error(f"Error fetching {table}: {e}")
+        return pd.DataFrame()
 
 def fetch_metrics():
     client = get_client()
-    # Explicitly fetch the single row of pre-calculated backend metrics
     res = client.table("daily_metrics_summary").select("*").limit(1).execute()
     return pd.DataFrame(res.data)
 
 def refresh():
     st.cache_data.clear()
-    with st.spinner("🔄 Synchronizing Backend + AI..."):
+    with st.spinner("🔄 Synchronizing Intelligence..."):
         try:
             requests.post("http://localhost:3001/api/ai/trigger", timeout=120)
             st.success("✅ Dashboard Synchronized")
         except:
-            st.error("❌ Backend not reachable")
+            st.warning("⚠️ Backend trigger timed out or unreachable, but data may still reload.")
     st.session_state.last_pull = datetime.now()
 
 # =====================================================
 # HEADER
 # =====================================================
 col1, col2 = st.columns([8,2])
-col1.markdown("## 💠 Aha CRM")
+col1.markdown("<h1 class='header-text'>💠 Aha CRM Intelligence</h1>", unsafe_allow_html=True)
 
-if col2.button("🔄 Refresh"):
+if col2.button("🔄 Force Sync AI", use_container_width=True):
     refresh()
 
 if "last_pull" not in st.session_state:
     st.session_state.last_pull = datetime.now()
 
 col2.caption(
-    f"Last pulled: {st.session_state.last_pull.strftime('%Y-%m-%d %H:%M:%S')}"
+    f"Last synchronized: {st.session_state.last_pull.strftime('%H:%M:%S')}"
 )
 
 st.divider()
@@ -111,7 +136,7 @@ st.divider()
 # =====================================================
 leads = fetch_table("crm_leads")
 deals = fetch_table("crm_deals")
-ai_summary = fetch_table("ai_summaries")
+ai_summary_table = fetch_table("ai_summaries")
 metrics = fetch_metrics()
 
 if not leads.empty:
@@ -122,337 +147,181 @@ if not deals.empty:
     deals["stage"] = deals["stage"].astype(str)
     deals["amount"] = pd.to_numeric(deals["amount"], errors="coerce").fillna(0)
 
-# =====================================================
-# 🔥 TODAY'S PERFORMANCE
-# =====================================================
-st.markdown(
-    "### 📅 Today's Strategic Pulse "
-    "<span style='font-size:14px;color:#94a3b8;'>(Daily)</span>",
-    unsafe_allow_html=True
-)
+# Get latest AI Payload
+ai_payload = {}
+if not ai_summary_table.empty:
+    latest_ai = ai_summary_table.sort_values("created_at", ascending=False).iloc[0]
+    ai_payload = latest_ai.get("payload", {})
 
-if not metrics.empty:
-    # Get the latest verified summary from the backend
-    m = metrics.iloc[0]
+# =====================================================
+# MAIN TABS
+# =====================================================
+tab_today, tab_pipeline, tab_ai = st.tabs([
+    "📅 Today's Strategic Pulse", 
+    "📊 Cumulative Pipeline", 
+    "🧠 AI Executive Insights"
+])
+
+# -----------------------------------------------------
+# TAB: TODAY
+# -----------------------------------------------------
+with tab_today:
+    st.markdown("### ⚡ Critical Metrics")
+    
+    # Use AI Payload for Deltas if available
+    overview = ai_payload.get("overview", {})
     
     k1, k2, k3, k4 = st.columns(4)
     
-    # These match the backend sync logic exactly
-    k1.metric("Today's New Leads", int(m["new_leads_today"]))
-    k2.metric("Qualified Leads", int(m["qualified_leads"]))
-    k3.metric("Deals Closed (Won)", int(m["deals_closed"]))
-    k4.metric("Revenue (Won Today)", f"₹ {float(m.get('deal_amount_won',0)):,.0f}")
-else:
-    st.info("No daily metrics available. Click Refresh to synchronize.")
+    def display_metric(col, label, key, default_val, prefix="", suffix=""):
+        data = overview.get(key, {})
+        val = data.get("value", default_val)
+        delta = data.get("changePct", 0)
+        trend = data.get("trendStr", "")
+        
+        # Format display
+        display_val = f"{prefix}{val}{suffix}"
+        
+        col.metric(
+            label=label,
+            value=display_val,
+            delta=f"{delta}% {trend}" if delta != 0 else None,
+            delta_color="normal" if data.get("isGood", True) else "inverse"
+        )
 
-st.divider()
+    if not metrics.empty:
+        m = metrics.iloc[0]
+        display_metric(k1, "Today's New Leads", "newLeads", int(m["new_leads_today"]))
+        display_metric(k2, "Today's Conversion Rate", "conversionRate", "0%", suffix="")
+        display_metric(k3, "Deals Closed (Won)", "dealsClosed", int(m["deals_closed"]))
+        display_metric(k4, "Revenue (Won Today)", "pipelineValue", f"₹ {float(m.get('deal_amount_won',0)):,.0f}")
+    else:
+        st.info("No daily metrics available. Click 'Force Sync AI' to synchronize.")
 
-# =====================================================
-# TOTAL PIPELINE OVERVIEW
-# =====================================================
-st.markdown(
-    "### 📊 Cumulative Pipeline "
-    "<span style='font-size:14px;color:#94a3b8;'>(All Time)</span>",
-    unsafe_allow_html=True
-)
-
-if not leads.empty and not deals.empty:
-    total_leads = len(leads)
+    st.divider()
     
-    # Active pipeline: Sum of amounts where stage is not Closed Won or Closed Lost
-    active_deals = deals[~deals["stage"].str.contains("closed", case=False)]
-    pipeline_value = active_deals["amount"].sum()
+    # Lead Lifecycle Metrics
+    st.markdown("#### 🔄 Lead Lifecycle")
+    if not metrics.empty:
+        m = metrics.iloc[0]
+        l1, l2, l3, l4 = st.columns(4)
+        l1.metric("Contacted", int(m.get("leads_contacted", 0)))
+        l2.metric("Qualified", int(m.get("qualified_leads", 0)))
+        l3.metric("Demos Scheduled", int(m.get("demos_scheduled", 0)))
+        l4.metric("Proposals Sent", int(m.get("proposals_sent", 0)))
+
+        st.divider()
+        
+        # Today's Revenue Loss/Total
+        r1, r2 = st.columns(2)
+        r1.metric("Revenue Lost Today", f"₹ {float(m.get('deal_amount_lost',0)):,.0f}")
+        r2.metric("Negotiations Active", int(m.get("negotiations_active", 0)))
+
+# -----------------------------------------------------
+# TAB: PIPELINE
+# -----------------------------------------------------
+with tab_pipeline:
+    st.markdown("### 📊 High-Resolution Conversion Funnel")
     
-    # Total Revenue: Only Closed Won deals
-    won_deals = deals[deals["stage"].str.contains("closed won", case=False)]
-    total_revenue_won = won_deals["amount"].sum()
-    
-    # Historical Win Rate (by Deal Count)
-    total_closed = deals[deals["stage"].str.contains("closed", case=False)]
-    won_count = len(won_deals)
-    win_rate = (won_count / len(total_closed) * 100) if len(total_closed) > 0 else 0
-
-    k1, k2, k3, k4 = st.columns(4)
-    k1.metric("Lifetime Leads", total_leads)
-    k2.metric("Open Pipeline Value", f"₹ {pipeline_value:,.0f}")
-    k3.metric("Total Revenue Won", f"₹ {total_revenue_won:,.0f}")
-    k4.metric("Win Rate (%)", f"{win_rate:.1f}%")
-
-st.divider()
-
-# =====================================================
-# LEADS THIS MONTH (Trend)
-# =====================================================
-st.markdown(
-    "### 📈 Leads This Month "
-    "<span style='font-size:14px;color:#94a3b8;'>(Monthly)</span>",
-    unsafe_allow_html=True
-)
-
-if not leads.empty:
-    now = datetime.now()
-
-    month_data = leads[
-        (leads["created_time"].dt.month == now.month) &
-        (leads["created_time"].dt.year == now.year)
-    ]
-
-    daily = (
-        month_data.groupby(month_data["created_time"].dt.date)
-        .size()
-        .reset_index(name="leads")
-    )
-
-    fig = px.area(
-        daily,
-        x="created_time",
-        y="leads",
-        color_discrete_sequence=[PRIMARY],
-        template="plotly_dark"
-    )
-
-    fig.update_layout(
-        plot_bgcolor="rgba(0,0,0,0)",
-        paper_bgcolor="rgba(0,0,0,0)",
-        yaxis=dict(gridcolor=GRID)
-    )
-
-    st.plotly_chart(fig, use_container_width=True)
-
-st.divider()
-
-# =====================================================
-# LEADS BY SOURCE
-# =====================================================
-st.markdown(
-    "### 🎯 Lead Source Distribution "
-    "<span style='font-size:14px;color:#94a3b8;'>(All Time)</span>",
-    unsafe_allow_html=True
-)
-
-if not leads.empty:
-    source_dist = leads["source"].value_counts().reset_index()
-    source_dist.columns = ["Source", "Count"]
-    
-    # Keep Top 5
-    top_n = 5
-    if len(source_dist) > top_n:
-        top_sources = source_dist.head(top_n)
-        others = pd.DataFrame({
-            "Source": ["Other"],
-            "Count": [source_dist["Count"][top_n:].sum()]
-        })
-        source_dist = pd.concat([top_sources, others], ignore_index=True)
-
-    fig = px.pie(
-        source_dist,
-        values="Count",
-        names="Source",
-        hole=0.6,
-        color_discrete_sequence=[PRIMARY, SUCCESS, ACCENT, CYAN, DANGER],
-        template="plotly_dark"
-    )
-    
-    fig.update_layout(
-        margin=dict(t=20, b=20, l=20, r=20),
-        plot_bgcolor="rgba(0,0,0,0)",
-        paper_bgcolor="rgba(0,0,0,0)"
-    )
-    st.plotly_chart(fig, use_container_width=True)
-
-# =====================================================
-# OPERATIONAL LEAK DETECTOR
-# =====================================================
-st.markdown(
-    "### 🕵️‍♂️ Operational Leak Detector "
-    "<span style='font-size:14px;color:#94a3b8;'>(Conversion Health)</span>",
-    unsafe_allow_html=True
-)
-
-if not leads.empty:
-    total_leads = len(leads)
-    converted_leads = leads["is_converted"].sum()
-    
-    active_deals = 0
-    won_deals = 0
-    
-    if not deals.empty:
-        active_deals = len(deals[~deals["stage"].str.contains("closed", case=False)])
-        won_deals = len(deals[deals["stage"].str.contains("closed won", case=False)])
-
-    leak_data = pd.DataFrame({
-        "Stage": ["Total Leads", "Converted Leads", "Active Deals", "Won Deals"],
-        "Count": [total_leads, converted_leads, active_deals, won_deals]
-    })
-
-    fig = px.funnel(
-        leak_data,
-        x="Count",
-        y="Stage",
-        color_discrete_sequence=[ACCENT],
-        template="plotly_dark"
-    )
-
-    fig.update_layout(
-        plot_bgcolor="rgba(0,0,0,0)",
-        paper_bgcolor="rgba(0,0,0,0)",
-        margin=dict(t=10, b=10)
-    )
-    
-    st.plotly_chart(fig, use_container_width=True)
-
-st.divider()
-
-# =====================================================
-# CONVERSION FUNNEL
-# =====================================================
-st.markdown(
-    "### 📊 Sales Conversion Funnel "
-    "<span style='font-size:14px;color:#94a3b8;'>(All Time)</span>",
-    unsafe_allow_html=True
-)
-
-if not leads.empty:
-    # We use the verified stages from the brief
-    stage_order = [
-        "Qualification", 
-        "Needs Analysis", 
-        "Value Proposition", 
-        "Id. Decision Makers", 
-        "Proposal/Price Quote", 
-        "Negotiation/Review", 
-        "Closed Won"
-    ]
-    
-    # Aggregate data
-    pipeline = deals.groupby("stage").size().reset_index(name="Count")
-    
-    # Create a full sequence for the funnel
-    funnel_data = []
-    total_leads = len(leads)
-    funnel_data.append({"Stage": "Total Leads", "Count": total_leads})
-    
-    for stage in stage_order:
-        count = pipeline[pipeline["stage"] == stage]["Count"].sum()
-        if count > 0 or stage == "Closed Won": # Ensure bottom of funnel shows
-            funnel_data.append({"Stage": stage, "Count": count})
+    if not leads.empty:
+        # Consolidated High-Res Funnel (from metrics.js logic)
+        total_leads = len(leads)
+        
+        if not deals.empty:
+            # We fetch pre-calculated funnel if possible, or build it
+            # For simplicity and accuracy with backend, we use the backend logic
+            # Stages: New Leads -> Contacted -> Qualified -> Proposal Sent -> Negotiation -> Won
             
-    df_funnel = pd.DataFrame(funnel_data)
+            won_deals = deals[deals["stage"].str.contains("closed won", case=False, na=False)]
+            negotiation_deals = deals[deals["stage"].str.contains("negotiation/review", case=False, na=False)]
+            proposal_deals = deals[deals["stage"].str.contains("proposal shared", case=False, na=False)]
+            
+            funnel_data = [
+                {"Stage": "Total Leads", "Count": total_leads},
+                {"Stage": "Contacted", "Count": len(deals)}, # Deals exist
+                {"Stage": "Qualified", "Count": len(deals[deals["stage"].str.contains("Awaiting Electric Plan", case=False, na=False)]) + len(proposal_deals) + len(negotiation_deals) + len(won_deals)},
+                {"Stage": "Proposal Shared", "Count": len(proposal_deals) + len(negotiation_deals) + len(won_deals)},
+                {"Stage": "Negotiation", "Count": len(negotiation_deals) + len(won_deals)},
+                {"Stage": "Closed Won", "Count": len(won_deals)}
+            ]
+            
+            df_funnel = pd.DataFrame(funnel_data)
+            fig = px.funnel(
+                df_funnel, x="Count", y="Stage",
+                color_discrete_sequence=[PRIMARY],
+                template="plotly_dark"
+            )
+            fig.update_layout(plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)")
+            st.plotly_chart(fig, use_container_width=True)
 
-    fig = px.funnel(
-        df_funnel,
-        x="Count",
-        y="Stage",
-        color_discrete_sequence=[PRIMARY],
-        template="plotly_dark"
-    )
+    st.divider()
+    
+    col_a, col_b = st.columns(2)
+    
+    with col_a:
+        st.markdown("#### 🎯 Lead Source Distribution")
+        if not leads.empty:
+            source_dist = leads["source"].value_counts().reset_index()
+            source_dist.columns = ["Source", "Count"]
+            source_dist["Source"] = source_dist["Source"].str.replace("_", " ").str.title()
+            
+            fig = px.pie(
+                source_dist.head(6), values="Count", names="Source",
+                hole=0.6,
+                color_discrete_sequence=[PRIMARY, SUCCESS, ACCENT, CYAN, DANGER, SECONDARY],
+                template="plotly_dark"
+            )
+            fig.update_layout(margin=dict(t=0, b=0, l=0, r=0), paper_bgcolor="rgba(0,0,0,0)")
+            st.plotly_chart(fig, use_container_width=True)
 
-    fig.update_layout(
-        plot_bgcolor="rgba(0,0,0,0)",
-        paper_bgcolor="rgba(0,0,0,0)"
-    )
-    st.plotly_chart(fig, use_container_width=True)
+    with col_b:
+        st.markdown("#### 💰 Revenue by Owner")
+        if not deals.empty:
+            won = deals[deals["stage"].str.contains("closed won", case=False)]
+            if not won.empty:
+                owner_rev = won.groupby("owner_name")["amount"].sum().reset_index().sort_values("amount", ascending=False)
+                fig = px.bar(
+                    owner_rev, x="owner_name", y="amount",
+                    color_discrete_sequence=[SUCCESS],
+                    template="plotly_dark"
+                )
+                fig.update_layout(plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", yaxis=dict(gridcolor=GRID))
+                st.plotly_chart(fig, use_container_width=True)
 
-st.divider()
+# -----------------------------------------------------
+# TAB: AI INSIGHTS
+# -----------------------------------------------------
+with tab_ai:
+    st.markdown("### 🧠 Executive Revenue Intelligence")
+    
+    if ai_payload:
+        summary = ai_payload.get("aiSummary", {}).get("text", "No summary available.")
+        viz_insight = ai_payload.get("vizInsights", {}).get("text", "")
+        
+        # Display Summary
+        st.markdown(f"""
+        <div style="background:{CARD}; padding:30px; border-radius:18px; border:1px solid {BORDER}; line-height:1.8; margin-bottom:20px;">
+            <h4 style="color:{PRIMARY}; margin-top:0;">📋 Strategic Briefing</h4>
+            {summary}
+        </div>
+        """, unsafe_allow_html=True)
+        
+        if viz_insight:
+            st.markdown(f"""
+            <div style="background:{CARD}; padding:25px; border-radius:18px; border:1px solid {BORDER}; border-left:4px solid {ACCENT};">
+                <h5 style="color:{ACCENT}; margin-top:0;">💡 Visualization Insight</h5>
+                {viz_insight}
+            </div>
+            """, unsafe_allow_html=True)
+            
+        # Last Run
+        run_time = ai_payload.get("aiSummary", {}).get("lastRunTime", "Recently")
+        st.caption(f"Intelligence generated at: {run_time}")
+    else:
+        st.info("No AI insights generated yet. Use 'Force Sync AI' to trigger the analysis pipeline.")
 
 # =====================================================
-# PIPELINE VALUE SUMMARY
+# FOOTER (Hidden in CSS but status for dev)
 # =====================================================
-st.markdown(
-    "### 💰 Pipeline Value Summary "
-    "<span style='font-size:14px;color:#94a3b8;'>(Current Status)</span>",
-    unsafe_allow_html=True
-)
-
-if not deals.empty:
-    open_deals = deals[~deals["stage"].str.contains("closed", case=False)]
-    open_value = open_deals["amount"].sum()
-
-    won_deals = deals[deals["stage"].str.contains("closed won", case=False)]
-    won_value = won_deals["amount"].sum()
-
-    lost_deals = deals[deals["stage"].str.contains("closed lost", case=False)]
-    lost_value = lost_deals["amount"].sum()
-
-    win_rate = (len(won_deals) / (len(won_deals) + len(lost_deals)) * 100) if (len(won_deals) + len(lost_deals)) > 0 else 0
-
-    p1, p2, p3, p4 = st.columns(4)
-    p1.metric("Open Pipeline", f"₹ {open_value:,.0f}")
-    p2.metric("Revenue Won", f"₹ {won_value:,.0f}")
-    p3.metric("Revenue Lost", f"₹ {lost_value:,.0f}")
-    p4.metric("Win Rate (%)", f"{win_rate:.1f}%")
-
-st.divider()
-
-# =====================================================
-# REVENUE BY OWNER
-# =====================================================
-st.markdown(
-    "### 💰 Revenue by Owner "
-    "<span style='font-size:14px;color:#94a3b8;'>(Closed Won)</span>",
-    unsafe_allow_html=True
-)
-
-if not deals.empty:
-    won = deals[
-        deals["stage"].str.contains("closed won",case=False)
-    ]
-
-    if not won.empty:
-        owner_rev = (
-            won.groupby("owner_name")["amount"]
-            .sum()
-            .reset_index()
-            .sort_values("amount",ascending=False)
-        )
-
-        fig = px.bar(
-            owner_rev,
-            x="owner_name",
-            y="amount",
-            color_discrete_sequence=[PRIMARY],
-            template="plotly_dark"
-        )
-
-        fig.update_layout(
-            plot_bgcolor="rgba(0,0,0,0)",
-            paper_bgcolor="rgba(0,0,0,0)",
-            yaxis=dict(gridcolor=GRID)
-        )
-
-        st.plotly_chart(fig, use_container_width=True)
-
-st.divider()
-
-# =====================================================
-# AI EXECUTIVE INSIGHTS
-# =====================================================
-st.markdown(
-    "### 🧠 AI Executive Insights "
-    "<span style='font-size:14px;color:#94a3b8;'>(Latest Analysis)</span>",
-    unsafe_allow_html=True
-)
-
-if not ai_summary.empty:
-    latest = ai_summary.sort_values(
-        "created_at",ascending=False
-    ).iloc[0]
-
-    summary = latest["payload"].get(
-        "aiSummary",{}
-    ).get("text","")
-
-    st.markdown(f"""
-    <div style="background:{CARD};
-                padding:28px;
-                border-radius:18px;
-                border:1px solid {BORDER};
-                line-height:1.7;">
-    <div style="font-size:12px;color:#94a3b8;margin-bottom:12px;">
-        📅 Insight Generated: {latest['created_at']}
-    </div>
-    {summary}
-    </div>
-    """, unsafe_allow_html=True)
-else:
-    st.info("No AI insights available.")
+if not ai_payload and not metrics.empty:
+    st.warning("⚠️ Metrics are loaded but AI analysis (deltas/insights) hasn't run for this data yet.")

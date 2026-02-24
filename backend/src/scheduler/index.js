@@ -47,11 +47,12 @@ export async function runPipeline({ sendWhatsApp = false } = {}) {
             leads_trend_30days: leadsTrend,
             leads_by_source: sourceDistribution.map(s => ({ source: s.name, leads: s.value, change_percent: 0 })),
             funnel: {
-                leads: funnelMetrics.leakFunnel.find(f => f.stage === 'Total Leads')?.count || 0,
-                converted: funnelMetrics.leakFunnel.find(f => f.stage === 'Converted Leads')?.count || 0,
-                active_deals: funnelMetrics.leakFunnel.find(f => f.stage === 'Active Deals')?.count || 0,
-                won: funnelMetrics.leakFunnel.find(f => f.stage === 'Won')?.count || 0,
-                conversion_rate: funnelMetrics.leakFunnel[0]?.count > 0 ? ((funnelMetrics.leakFunnel[funnelMetrics.leakFunnel.length - 1]?.count / funnelMetrics.leakFunnel[0]?.count) * 100).toFixed(1) : 0
+                leads: funnelMetrics[0]?.count || 0,
+                contacted: funnelMetrics.find(f => f.stage === 'Contacted')?.count || 0,
+                qualified: funnelMetrics.find(f => f.stage === 'Qualified')?.count || 0,
+                proposal_sent: funnelMetrics.find(f => f.stage === 'Proposal Sent')?.count || 0,
+                won: funnelMetrics.find(f => f.stage === 'Won')?.count || 0,
+                conversion_rate: funnelMetrics[0]?.count > 0 ? ((funnelMetrics[funnelMetrics.length - 1]?.count / funnelMetrics[0]?.count) * 100).toFixed(1) : 0
             },
             pipeline: {
                 total_value: metricsPayload.metrics.pipeline_value,
@@ -65,7 +66,7 @@ export async function runPipeline({ sendWhatsApp = false } = {}) {
         console.log('4. Generating AI Insights with Ollama ...');
         const summaryJSON = await generateInsights(fullPayload);
 
-        const vizPayload = { funnel: funnelMetrics.fullFunnel, sources: sourceDistribution };
+        const vizPayload = { funnel: funnelMetrics, sources: sourceDistribution };
         const vizJSON = await generateVizInsights(vizPayload);
 
         console.log('4c. Generating Shortened WhatsApp Summary...');
