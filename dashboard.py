@@ -421,6 +421,33 @@ elif active_tab == "📊 Pipeline Performance":
 
         st.divider()
 
+        st.markdown("#### 📅 Daily Lead Generation (This Month)")
+        if not p_leads.empty:
+            # Extract date only for grouping
+            p_leads["date"] = p_leads["created_time"].dt.date
+            daily_leads = p_leads.groupby("date").size().reset_index(name="Lead Count")
+            daily_leads = daily_leads.sort_values("date", ascending=False)
+            
+            # Use columns for a more focused table view
+            t1, t2 = st.columns([2, 1])
+            with t1:
+                st.dataframe(
+                    daily_leads,
+                    column_config={
+                        "date": st.column_config.DateColumn("Date", format="DD MMM YYYY"),
+                        "Lead Count": st.column_config.NumberColumn("Leads", format="%d 👤")
+                    },
+                    hide_index=True,
+                    width="stretch"
+                )
+            with t2:
+                avg_daily = daily_leads["Lead Count"].mean()
+                max_daily = daily_leads["Lead Count"].max()
+                st.metric("Avg Leads / Day", f"{avg_daily:.1f}")
+                st.metric("Peak Day", f"{int(max_daily)}")
+
+        st.divider()
+
         col3, col4 = st.columns(2)
 
         with col3:
