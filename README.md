@@ -1,12 +1,12 @@
 # 🏠 AHA Smart Homes — AI-Powered CRM Intelligence Platform
 
-[![Streamlit App](https://img.shields.io/badge/Streamlit-FF4B4B?style=for-the-badge&logo=Streamlit&logoColor=white)](https://streamlit.io/)
+[![Node.js](https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)](https://nodejs.org/)
+[![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![Supabase](https://img.shields.io/badge/Supabase-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)](https://supabase.com/)
 [![Ollama](https://img.shields.io/badge/Ollama-000000?style=for-the-badge&logo=ollama&logoColor=white)](https://ollama.com/)
-[![Twilio](https://img.shields.io/badge/Twilio-F22F46?style=for-the-badge&logo=Twilio&logoColor=white)](https://www.twilio.com/)
 [![Zoho](https://img.shields.io/badge/Zoho_CRM-EE2E24?style=for-the-badge&logo=zoho&logoColor=white)](https://www.zoho.com/crm/)
 
-A fully automated, production-grade CRM intelligence system that pulls all data from Zoho CRM across every module, stores it with zero data loss in a Supabase PostgreSQL cloud database, performs deep SQL analytics, and generates AI-driven executive insights using a private local Llama 3.2 model. Featuring a premium **Glassmorphism UI** with real-time trend intelligence.
+A professional-grade CRM intelligence system that automates the pipeline from data extraction to executive decision-making. The platform synchronizes live data from Zoho CRM, performs complex revenue analytics in a Supabase PostgreSQL environment, and generates strategic insights using a local Llama 3.2 model for 100% data privacy.
 
 ---
 
@@ -45,39 +45,35 @@ flowchart TD
 
 ---
 
+
+## 🏗️ System Architecture
+
+The system follows a modular, decoupled architecture to ensure scalability and reliability:
+
+1.  **Ingestion Layer**: A Node.js engine performs incremental syncs from Zoho CRM using OAuth 2.0 and high-water mark tracking.
+2.  **Storage Layer**: Supabase (PostgreSQL) manages relational CRM data and structured AI payloads.
+3.  **Analytics Layer**: A specialized JavaScript engine calculates funnel velocity, win rates, and pipeline health.
+4.  **Intelligence Layer**: Local Llama 3.2 (via Ollama) processes quantitative metrics into qualitative strategic briefs.
+5.  **Interface Layer**: A multi-tab Streamlit dashboard provides real-time visualization and manual pipeline triggers.
+6.  **Notification Layer**: Twilio WhatsApp API delivers daily "Revenue Pulse" summaries directly to executive mobile devices.
+
+---
+
 ## 📂 Project Structure
 
 ```text
 AHA Smart Homes Project /
 ├── backend/
 │   ├── src/
-│   │   ├── ai/
-│   │   │   └── ollamaClient.js      # Executive Briefing Generator (Llama 3.2 Agent)
-│   │   ├── analytics/
-│   │   │   └── metrics.js           # Funnel & Revenue Logic (PostgreSQL + JS)
-│   │   ├── api/
-│   │   │   ├── aiRoutes.js          # REST API for insights & triggers
-│   │   │   └── server.js            # Express API Server (Webhook & Sync Trigger)
-│   │   ├── auth/
-│   │   │   └── zohoAuth.js          # Zoho OAuth 2.0 Client & Token Rotation
-│   │   ├── config/
-│   │   │   └── env.js               # Centralized Environment config & validation
-│   │   ├── ingestion/
-│   │   │   ├── leads.js             # Zoho Leads Dynamic Module Extraction
-│   │   │   └── deals.js             # Zoho Deals Ingestion logic
-│   │   ├── scheduler/
-│   │   │   └── index.js             # Main Orchestrator: Sync → SQL → AI → WhatsApp
-│   │   ├── utils/
-│   │   │   ├── schema.sql           # Database schema definitions (JSONB ELT)
-│   │   │   └── supabaseClient.js    # Supabase (PostgreSQL) Client adapter
-│   │   └── whatsapp/
-│   │       └── twilioClient.js      # Twilio WhatsApp Dispatcher
-│   ├── package.json                 # Backend dependencies & pipeline scripts
-│   └── .env                         # Sensitive configuration (NOT committed)
-└── dashboard.py                     # Premium Glassmorphism Dashboard (Multi-tab layout)
-```
-
----
+│   │   ├── ai/ollamaClient.js      # Local LLM integration & prompt engineering
+│   │   ├── analytics/metrics.js    # Revenue & Funnel calculation logic
+│   │   ├── api/                    # Express.js REST endpoints & Webhooks
+│   │   ├── auth/zohoAuth.js        # OAuth 2.0 flow & token rotation
+│   │   ├── ingestion/syncService.js # Incremental Zoho data extraction
+│   │   ├── scheduler/index.js      # Main pipeline orchestrator (Cron)
+│   │   └── whatsapp/twilioClient.js # WhatsApp notification dispatcher
+│   └── .env                         # Environment configuration
+└── dashboard.py                     # Streamlit Executive Dashboard
 
 ## ⚙️ Setup & Installation
 
@@ -130,28 +126,6 @@ Open your Supabase project → SQL Editor → paste the contents of `backend/src
     - **Justification**: 100% data privacy (no sensitive lead info leaves the machine) and $0 inference cost.
 - **Twilio WhatsApp API**: Industry standard for reliable, high-deliverability mobile alerts.
 
----
-
-## 🏗️ Design Decisions & Trade-offs
-
-1. **SQL Math vs. LLM Math**: 
-    - *Decision*: All funnel calculations (Lead-to-Won rates, Total Revenue) are performed in the PostgreSQL layer using complex SQL aggregations. 
-    - *Rationale*: LLMs are prone to "hallucinations" when performing arithmetic. Offloading math to SQL ensures 100% accurate KPIs, allowing the AI to focus on **qualitative strategy**.
-2. **Synchronous Dashboard Refresh**: 
-    - *Decision*: The Streamlit "Refresh" button triggers a synchronous backend pipeline.
-    - *Trade-off*: While slower than an async trigger, it provides the executive with immediate feedback and a guaranteed "Success" state once the UI updates.
-3. **Immutability in Sync**: 
-    - *Decision*: We use a `sync_logs` table to track every fetch.
-    - *Rationale*: Provides a reliable audit trail for debugging Zoho API issues and ensures idempotency during incremental syncs.
-
----
-
-## 🧠 Product Thinking: The "CRO Persona"
-
-This system isn't just a data bridge; it's a **context engine**. 
-- **Strategic Persona**: The AI is prompted as a Chief Revenue Officer. Instead of saying "Leads are up by 10%," it says, "We have a 10% surge in Facebook leads, but conversion velocity is slowing—recommend re-allocating budget to High-Value Deals."
-- **Trend Intelligence**: The system automatically calculates performance deltas (e.g., vs 7-day averages) and presents them as colored indicators (Deltas) for immediate pulse checking.
-- **Daily Pulse**: The WhatsApp summary is limited to 400 characters, forcing the AI to provide only the "Critical Gap" and "Immediate Action," respecting the executive's time.
 
 
 
