@@ -585,8 +585,14 @@ elif active_tab == "📊 Pipeline Performance":
             st.info(f"No deal activity recorded for {date_range}.")
 
 elif active_tab == "🧠 AI Executive Insights":
-    if not ai_table.empty:
-        latest = ai_table.iloc[0]
+    # AI Insights strictly follow a "Today-only" policy as requested
+    ai_data = ai_table
+    if date_range != "Today":
+        with st.spinner("🧠 Adjusting for Daily Strategy..."):
+            _, _, _, ai_data, _ = fetch_filtered_data("Today")
+
+    if not ai_data.empty:
+        latest = ai_data.iloc[0]
         payload = latest.get("payload", {})
         summary = payload.get("aiSummary", {}).get("text", "No summary available")
 
@@ -594,13 +600,20 @@ elif active_tab == "🧠 AI Executive Insights":
         <div style="background: linear-gradient(145deg, {CARD_BG}, rgba(15,23,42,0.8)); 
                     padding: 32px; border-radius: 20px; border: 1px solid {BORDER};
                     box-shadow: 0 10px 30px -10px rgba(0,0,0,0.3);">
-            <h3 style="margin-top:0; margin-bottom: 20px;" class="gradient-header">
-                ✨ Strategic Briefing ({date_range})
-            </h3>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h3 style="margin:0;" class="gradient-header">
+                    ✨ Daily Strategic Briefing
+                </h3>
+                <span style="background:{ACCENT}22; color:{ACCENT}; font-size:0.75rem; 
+                             font-weight:700; padding:4px 12px; border-radius:99px; 
+                             border:1px solid {ACCENT}44; text-transform:uppercase;">
+                    Focus: Today
+                </span>
+            </div>
             <div style="line-height: 1.7; font-size: 1.05rem; color: #e2e8f0;">
                 {summary}
             </div>
         </div>
         """, unsafe_allow_html=True)
     else:
-        st.info("No AI insights generated yet.")
+        st.info("No AI insights generated for Today yet. 🚀")
