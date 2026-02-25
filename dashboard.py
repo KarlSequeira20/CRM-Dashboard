@@ -370,6 +370,10 @@ if active_tab == "⚡ Strategic Pulse":
             pass
 
     def get_delta(key, is_percent=False):
+        # Strict requirement: only show deltas for "Today"
+        if date_range != "Today":
+            return None
+
         label_map = {
             "Yesterday": "vs prev day",
             "Day Before Yesterday": "vs prev day",
@@ -379,7 +383,7 @@ if active_tab == "⚡ Strategic Pulse":
         suffix = label_map.get(comp_range, "vs prev")
         
         if not prev: 
-            return f"0% {suffix}"
+            return None
             
         c_val = curr[key]
         p_val = prev[key]
