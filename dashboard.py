@@ -224,12 +224,12 @@ with nav_cols[1]:
         st.markdown("<div style='margin-top: -15px;'></div>", unsafe_allow_html=True)
         date_range = st.selectbox(
             "Period Filter",
-            ["Today", "Yesterday", "This Month", "This Year", "Last Year", "All Time"],
+            ["Today", "Yesterday", "This Month", "This Year"],
             index=0,
             label_visibility="collapsed"
         )
     else:
-        date_range = "All Time" # Default for other views to show complete data
+        date_range = "This Month" # Default for other views to show recent data
 
 # =====================================================
 # LOAD & PREP DATA
