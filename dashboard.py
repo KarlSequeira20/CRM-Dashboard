@@ -154,12 +154,12 @@ def get_date_range(option):
     # Convert to UTC ISO for Supabase
     start_utc = start.astimezone(timezone.utc).isoformat() if start else None
     end_utc = end.astimezone(timezone.utc).isoformat() if end else None
-    return start_utc, end_utc
+    return start_utc, end_utc, start, end
 
 @st.cache_data(ttl=30)
 def fetch_filtered_data(range_label):
     url = "http://localhost:3001/api/dashboard/data"
-    start_utc, end_utc = get_date_range(range_label)
+    start_utc, end_utc, _, _ = get_date_range(range_label)
     
     # Snapshot path for emergency fallback if backend is down
     snapshot_path = os.path.join(os.path.dirname(__file__), 'backend', 'data_snapshot.json')
@@ -170,26 +170,38 @@ def fetch_filtered_data(range_label):
         res = requests.get(url, params=params, timeout=10)
         res.raise_for_status()
         data = res.json()
-        return (
-            pd.DataFrame(data.get("leads", [])),
-            pd.DataFrame(data.get("deals", [])),
-            pd.DataFrame(data.get("metrics", [])),
-            pd.DataFrame(data.get("ai_table", [])),
-            data.get("source", "live")
-        )
+        source = "live"
     except Exception as e:
         # 2. Fallback to Local Snapshot if backend/network is unreachable
         if os.path.exists(snapshot_path):
             with open(snapshot_path, 'r') as f:
                 data = json.load(f)
-            return (
-                pd.DataFrame(data.get("leads", [])),
-                pd.DataFrame(data.get("deals", [])),
-                pd.DataFrame(data.get("metrics", [])),
-                pd.DataFrame(data.get("ai_table", [])),
-                "cache"
-            )
-        raise ConnectionError(f"Backend unreachable and no local cache found. {str(e)}")
+            source = "cache"
+        else:
+            raise ConnectionError(f"Backend unreachable and no local cache found. {str(e)}")
+
+    # PROCESS DATA (Unify for both Live and Cache)
+    leads = pd.DataFrame(data.get("leads", []))
+    deals = pd.DataFrame(data.get("deals", []))
+    
+    # Ensure proper typing and IST conversion
+    for df in [leads, deals]:
+        if not df.empty:
+            for col in ["created_time", "closed_time", "modified_time"]:
+                if col in df.columns:
+                    df[col] = pd.to_datetime(df[col], utc=True).dt.tz_convert(IST)
+            if "amount" in df.columns:
+                df["amount"] = pd.to_numeric(df["amount"], errors="coerce").fillna(0)
+            if "stage" in df.columns:
+                df["stage"] = df["stage"].astype(str)
+
+    return (
+        leads, 
+        deals,
+        pd.DataFrame(data.get("metrics", [])),
+        pd.DataFrame(data.get("ai_table", [])),
+        source
+    )
 
     # Centers the entire dashboard content for better balance on large screens
     st.markdown("""
@@ -244,47 +256,39 @@ with nav_cols[1]:
 # =====================================================
 try:
     with st.spinner(f"⚡ Fetching {date_range} Pipeline..."):
+        # Get boundaries
+        start_utc, end_utc, win_start, win_end = get_date_range(date_range)
+        
+        # Fetch data (now includes all processing and typing)
         leads, deals, metrics, ai_table, data_source = fetch_filtered_data(date_range)
         
         if data_source == "cache":
             st.warning("📡 Offline Mode: Displaying last successful data snapshot (Supabase unreachable).")
-        
-        # Define Filter Boundaries
-        start_utc, end_utc = get_date_range(date_range)
-        
-        # Convert UTC strings to IST datetimes
-        if not leads.empty:
-            leads["created_time"] = pd.to_datetime(leads["created_time"], utc=True).dt.tz_convert(IST)
-        if not deals.empty:
-            deals["created_time"] = pd.to_datetime(deals["created_time"], utc=True).dt.tz_convert(IST)
-            deals["modified_time"] = pd.to_datetime(deals["modified_time"], utc=True).dt.tz_convert(IST)
-            deals["closed_time"] = pd.to_datetime(deals["closed_time"], utc=True).dt.tz_convert(IST)
-            deals["stage"] = deals["stage"].astype(str)
-            deals["amount"] = pd.to_numeric(deals["amount"], errors="coerce").fillna(0)
 
-        # Apply Global Filter
-        if date_range != "All Time":
-            if start_utc:
-                st_ts = pd.to_datetime(start_utc, utc=True).tz_convert(IST)
-                leads = leads[leads["created_time"] >= st_ts]
-                deals = deals[
-                    (deals["created_time"] >= st_ts) | 
-                    (deals["modified_time"] >= st_ts) |
-                    (deals["closed_time"] >= st_ts)
-                ]
-            if end_utc:
-                en_ts = pd.to_datetime(end_utc, utc=True).tz_convert(IST)
-                leads = leads[leads["created_time"] < en_ts]
-                deals = deals[
-                    (deals["created_time"] < en_ts) & 
-                    (
-                        (deals["modified_time"] < en_ts) |
-                        (deals["closed_time"] < en_ts)
-                    )
-                ]
+    # Strict Global Filtering by IST boundaries
+    if not leads.empty:
+        leads = leads[leads["created_time"] >= win_start]
+        if win_end:
+            leads = leads[leads["created_time"] < win_end]
+            
+    if not deals.empty:
+        # A deal is "active" in a period if created, modified, or closed then
+        deals = deals[
+            (deals["created_time"] >= win_start) | 
+            (deals["modified_time"] >= win_start) |
+            (deals["closed_time"] >= win_start)
+        ]
+        if win_end:
+            deals = deals[
+                (deals["created_time"] < win_end) & 
+                (
+                    (deals["modified_time"] < win_end) |
+                    (deals["closed_time"] < win_end)
+                )
+            ]
 except ConnectionError as ce:
     st.error(f"❌ Network Error: {str(ce)}")
-    st.info("� Tip: Try pinging your Supabase URL or checking if your VPN is blocking the connection.")
+    st.info("💡 Tip: Try pinging your Supabase URL or checking if your VPN is blocking the connection.")
     st.stop()
 except Exception as e:
     st.error(f"📡 API Error: Supabase is taking too long to respond or returned an error. {str(e)}")
@@ -315,11 +319,25 @@ if active_tab == "⚡ Strategic Pulse":
         t_nego    = safe_i(m.get("negotiations_active", 0))
         t_prop    = safe_i(m.get("proposals_sent", 0))
         avg_deal  = (rev_won / t_won) if t_won > 0 else 0
-    def get_comparison(leads_df, deals_df):
-        won = deals_df[deals_df["stage"].str.contains("closed won", case=False, na=False)] if not deals_df.empty else pd.DataFrame()
-        lost = deals_df[deals_df["stage"].str.contains("closed lost", case=False, na=False)] if not deals_df.empty else pd.DataFrame()
-        nego = deals_df[deals_df["stage"].str.contains("negotiation", case=False, na=False)] if not deals_df.empty else pd.DataFrame()
-        prop = deals_df[deals_df["stage"].str.contains("proposal|quote", case=False, na=False)] if not deals_df.empty else pd.DataFrame()
+    def get_comparison(leads_df, deals_df, start_dt, end_dt):
+        # Strict Period Outcomes Logic
+        # Note: Input dfs are already globally filtered by the time window
+        won  = deals_df[
+            (deals_df["stage"].str.contains("closed won", case=False, na=False)) & 
+            (deals_df["closed_time"] >= start_dt)
+        ]
+        if end_dt and not won.empty:
+            won = won[won["closed_time"] < end_dt]
+
+        lost = deals_df[
+            (deals_df["stage"].str.contains("closed lost", case=False, na=False)) & 
+            (deals_df["closed_time"] >= start_dt)
+        ]
+        if end_dt and not lost.empty:
+            lost = lost[lost["closed_time"] < end_dt]
+
+        nego = deals_df[deals_df["stage"].str.contains("negotiation", case=False, na=False)]
+        prop = deals_df[deals_df["stage"].str.contains("proposal|quote", case=False, na=False)]
         
         rw = won["amount"].sum() if not won.empty else 0
         rl = lost["amount"].sum() if not lost.empty else 0
@@ -336,8 +354,8 @@ if active_tab == "⚡ Strategic Pulse":
             "avg_deal": (rw / len(won)) if not won.empty else 0
         }
 
-    # Current Metrics
-    curr = get_comparison(leads, deals)
+    # Current Metrics (Data is already filtered)
+    curr = get_comparison(leads, deals, win_start, win_end)
 
     # Fetch Comparison Data
     comp_range = None
@@ -349,12 +367,9 @@ if active_tab == "⚡ Strategic Pulse":
     prev = None
     if comp_range:
         try:
+            _, _, p_ws, p_we = get_date_range(comp_range)
             p_leads, p_deals, p_met, p_ai, _ = fetch_filtered_data(comp_range)
-            # Ensure proper typing
-            if not p_deals.empty:
-                p_deals["amount"] = pd.to_numeric(p_deals["amount"], errors="coerce").fillna(0)
-                p_deals["stage"] = p_deals["stage"].astype(str)
-            prev = get_comparison(p_leads, p_deals)
+            prev = get_comparison(p_leads, p_deals, p_ws, p_we)
         except:
             pass
 
@@ -416,7 +431,7 @@ if active_tab == "⚡ Strategic Pulse":
 
 elif active_tab == "📊 Pipeline Performance":
     # Pipeline Performance charts default to "This Month" as requested
-    m_start, m_end = get_date_range("This Month")
+    m_start, m_end, p_ws, p_we = get_date_range("This Month")
     st_ts = pd.to_datetime(m_start, utc=True).tz_convert(IST)
     en_ts = pd.to_datetime(m_end, utc=True).tz_convert(IST) if m_end else None
     
