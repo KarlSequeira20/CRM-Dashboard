@@ -61,7 +61,7 @@ The system follows a modular, decoupled architecture to ensure scalability and r
 
 ## 📂 Project Structure
 
-```text
+
 AHA Smart Homes Project /
 ├── backend/
 │   ├── src/
@@ -80,9 +80,9 @@ AHA Smart Homes Project /
 ### Prerequisites
 - **Python 3.10+**
 - **[Ollama](https://ollama.com/)** with `llama3.2:1b` pulled locally
-- A **Zoho CRM** account with API credentials
-- A **Supabase** project
-- A **Twilio** account with WhatsApp Sandbox enabled
+- **Zoho CRM** account with API credentials
+- **Supabase** project
+- **Twilio** account with WhatsApp Sandbox enabled
 
 ### 1. Install Dependencies
 ```bash
