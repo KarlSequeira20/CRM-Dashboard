@@ -239,17 +239,13 @@ with nav_cols[0]:
     )
 
 with nav_cols[1]:
-    # Only show filter for Strategic Pulse
-    if active_tab == "⚡ Strategic Pulse":
-        st.markdown("<div style='margin-top: -15px;'></div>", unsafe_allow_html=True)
-        date_range = st.selectbox(
-            "Period Filter",
-            ["Today", "Yesterday", "This Month", "This Year"],
-            index=0,
-            label_visibility="collapsed"
-        )
-    else:
-        date_range = "This Month" # Default for other views to show recent data
+    st.markdown("<div style='margin-top: -15px;'></div>", unsafe_allow_html=True)
+    date_range = st.selectbox(
+        "Period Filter",
+        ["Today", "Yesterday", "This Month", "This Year"],
+        index=0,
+        label_visibility="collapsed"
+    )
 
 # =====================================================
 # LOAD & PREP DATA
@@ -419,7 +415,7 @@ if active_tab == "⚡ Strategic Pulse":
 
     if date_range == "Today" and not metrics.empty:
         m = metrics.iloc[0]
-        st.markdown("#### 🗓️ Today's Lifecycle Activity *(from daily sync)*")
+        st.markdown(f"#### 🗓️ {date_range}'s Lifecycle Activity *(from daily sync)*")
         l1, l2, l3, l4, l5 = st.columns(5)
         l1.metric("📞 Contacted",      human_format(safe_i(m.get("leads_contacted", 0))))
         l2.metric("⭐ Qualified",      human_format(safe_i(m.get("qualified_leads", 0))))
@@ -430,8 +426,8 @@ if active_tab == "⚡ Strategic Pulse":
     st.divider()
 
 elif active_tab == "📊 Pipeline Performance":
-    # Pipeline Performance charts default to "This Month" as requested
-    m_start, m_end, p_ws, p_we = get_date_range("This Month")
+    # Pipeline Performance charts now sync with the global filter
+    m_start, m_end, p_ws, p_we = get_date_range(date_range)
     st_ts = pd.to_datetime(m_start, utc=True).tz_convert(IST)
     en_ts = pd.to_datetime(m_end, utc=True).tz_convert(IST) if m_end else None
     
@@ -447,7 +443,7 @@ elif active_tab == "📊 Pipeline Performance":
         p_deals = p_deals[p_deals["created_time"] < en_ts]
     
     if p_leads.empty and p_deals.empty:
-        st.info("No leads or deals recorded for This Month. 🚀")
+        st.info(f"No leads or deals recorded for {date_range}. 🚀")
     else:
         def chart_layout(fig, title=""):
             fig.update_layout(
@@ -465,7 +461,7 @@ elif active_tab == "📊 Pipeline Performance":
         col1, col2 = st.columns(2)
 
         with col1:
-            st.markdown("#### 📅 Daily Lead Distribution (This Month)")
+            st.markdown(f"#### 📅 Lead Distribution ({date_range})")
             if not p_leads.empty:
                 # Group by day
                 p_leads["day"] = p_leads["created_time"].dt.date
@@ -484,7 +480,7 @@ elif active_tab == "📊 Pipeline Performance":
                 st.info("No leads generated this month.")
 
         with col2:
-            st.markdown("#### 🎯 Sources (This Month)")
+            st.markdown(f"#### 🎯 Sources ({date_range})")
             if not p_leads.empty:
                 src = p_leads["source"].value_counts().reset_index()
                 src.columns = ["Source", "Count"]
@@ -501,7 +497,7 @@ elif active_tab == "📊 Pipeline Performance":
         col3, col4 = st.columns(2)
 
         with col3:
-            st.markdown("#### 👥 Team Performance (This Month)")
+            st.markdown(f"#### 👥 Team Performance ({date_range})")
             if not p_deals.empty:
                 won_period = p_deals[p_deals["stage"].str.contains("closed won", case=False, na=False)]
                 t_total = p_deals.groupby("owner_name").size().reset_index(name="Touched")
@@ -520,7 +516,7 @@ elif active_tab == "📊 Pipeline Performance":
                 st.info("No deal activity assigned this month.")
 
         with col4:
-            st.markdown("#### 💰 Pipeline Value (This Month)")
+            st.markdown(f"#### 💰 Pipeline Value ({date_range})")
             if not p_deals.empty:
                 pv = p_deals.groupby("stage")["amount"].sum().reset_index().sort_values("amount", ascending=True)
                 fig = px.bar(
@@ -537,7 +533,7 @@ elif active_tab == "📊 Pipeline Performance":
 
         st.divider()
 
-        st.markdown("#### 📰 Deal Activity Log (This Month)")
+        st.markdown(f"#### 📰 Deal Activity Log ({date_range})")
         recent = p_deals.sort_values("created_time", ascending=False).head(20) if not p_deals.empty else pd.DataFrame()
         if not recent.empty:
             for _, row in recent.iterrows():
@@ -599,7 +595,7 @@ elif active_tab == "🧠 AI Executive Insights":
                     padding: 32px; border-radius: 20px; border: 1px solid {BORDER};
                     box-shadow: 0 10px 30px -10px rgba(0,0,0,0.3);">
             <h3 style="margin-top:0; margin-bottom: 20px;" class="gradient-header">
-                ✨ Latest Strategic Briefing
+                ✨ Strategic Briefing ({date_range})
             </h3>
             <div style="line-height: 1.7; font-size: 1.05rem; color: #e2e8f0;">
                 {summary}
