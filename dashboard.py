@@ -344,6 +344,7 @@ if active_tab == "⚡ Strategic Pulse":
     if date_range == "Today": comp_range = "Yesterday"
     elif date_range == "Yesterday": comp_range = "Day Before Yesterday"
     elif date_range == "This Month": comp_range = "Last Month"
+    elif date_range == "This Year": comp_range = "Last Year"
 
     prev = None
     if comp_range:
@@ -358,14 +359,29 @@ if active_tab == "⚡ Strategic Pulse":
             pass
 
     def get_delta(key, is_percent=False):
-        if not prev: return None
+        label_map = {
+            "Yesterday": "vs prev day",
+            "Day Before Yesterday": "vs prev day",
+            "Last Month": "vs last month",
+            "Last Year": "vs last year"
+        }
+        suffix = label_map.get(comp_range, "vs prev")
+        
+        if not prev: 
+            return f"0% {suffix}"
+            
         c_val = curr[key]
         p_val = prev[key]
-        if p_val == 0: return f"+{c_val}" if c_val > 0 else None
+        
+        if p_val == 0: 
+            return f"+{c_val} {suffix}" if c_val > 0 else f"0% {suffix}"
+            
         diff = c_val - p_val
-        if is_percent: return f"{diff:.1f}%"
+        if is_percent: 
+            return f"{diff:+.1f}% {suffix}"
+            
         perc = (diff / p_val) * 100
-        return f"{perc:+.1f}%"
+        return f"{perc:+.1f}% {suffix}"
 
     st.markdown(f"#### ⚡ {date_range} Performance")
     k1, k2, k3, k4, k5 = st.columns(5)
