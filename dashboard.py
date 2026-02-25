@@ -207,31 +207,29 @@ if c2.button("🔄 Sync AI / Cache", width="stretch"):
 st.divider()
 
 # -----------------------------------------------------
-# TABS & FILTER ROW
+# NAVIGATION & FILTER ROW
 # -----------------------------------------------------
-# We use columns to put the filter on the same line as the tab headers
-# -----------------------------------------------------
-# TABS & FILTER ROW
-# -----------------------------------------------------
-# Tighter column logic to prevent "off-centered" feel
-tc1, tc2 = st.columns([10, 2])
-
-with tc2:
-    # Adjusting vertical alignment to match the tab labels precisely
-    st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
-    date_range = st.selectbox(
-        "Period Filter",
-        ["Today", "Yesterday", "This Month", "This Year", "Last Year", "All Time"],
-        index=0,
+nav_cols = st.columns([8, 2])
+with nav_cols[0]:
+    active_tab = st.radio(
+        "Navigation",
+        ["⚡ Strategic Pulse", "📊 Pipeline Performance", "🧠 AI Executive Insights"],
+        horizontal=True,
         label_visibility="collapsed"
     )
 
-with tc1:
-    tab_today, tab_pipeline, tab_ai = st.tabs([
-        "⚡ Strategic Pulse",
-        "📊 Pipeline Performance",
-        "🧠 AI Executive Insights"
-    ])
+with nav_cols[1]:
+    # Only show filter for Strategic Pulse
+    if active_tab == "⚡ Strategic Pulse":
+        st.markdown("<div style='margin-top: -15px;'></div>", unsafe_allow_html=True)
+        date_range = st.selectbox(
+            "Period Filter",
+            ["Today", "Yesterday", "This Month", "This Year", "Last Year", "All Time"],
+            index=0,
+            label_visibility="collapsed"
+        )
+    else:
+        date_range = "All Time" # Default for other views to show complete data
 
 # =====================================================
 # LOAD & PREP DATA
@@ -288,10 +286,8 @@ except Exception as e:
 # Define Tab Objects (Inside tc1 to keep filter on same line)
 # Note: Data loading moved UP to before tab rendering
 
-# -----------------------------------------------------
-# STRATEGIC PULSE TAB
-# -----------------------------------------------------
-with tab_today:
+# Replace Tab rendering with conditional rendering based on active_tab
+if active_tab == "⚡ Strategic Pulse":
     # Use pre-calculated backend metrics only for "Today"
     if date_range == "Today" and not metrics.empty:
         m = metrics.iloc[0]
@@ -355,13 +351,27 @@ with tab_today:
         l4.metric("🖥️ Demo Held",      human_format(safe_i(m.get("demos_held", 0))))
         l5.metric("⏱️ Last Synced",    str(m.get("updated_at","—"))[:16].replace("T"," "))
 
+    st.divider()
 
-# -----------------------------------------------------
-# TODAY's PIPELINE TAB
-# -----------------------------------------------------
-with tab_pipeline:
-    if leads.empty and deals.empty:
-        st.info(f"No leads or deals recorded for {date_range}. 🚀")
+elif active_tab == "📊 Pipeline Performance":
+    # Pipeline Performance defaults to "This Month" to stay relevant
+    m_start, m_end = get_date_range("This Month")
+    st_ts = pd.to_datetime(m_start, utc=True).tz_convert(IST)
+    en_ts = pd.to_datetime(m_end, utc=True).tz_convert(IST) if m_end else None
+    
+    p_leads = leads[leads["created_time"] >= st_ts].copy() if not leads.empty else leads.copy()
+    p_deals = deals[
+        (deals["created_time"] >= st_ts) | 
+        (deals["modified_time"] >= st_ts) |
+        (deals["closed_time"] >= st_ts)
+    ].copy() if not deals.empty else deals.copy()
+    
+    if en_ts:
+        p_leads = p_leads[p_leads["created_time"] < en_ts]
+        p_deals = p_deals[p_deals["created_time"] < en_ts]
+    
+    if p_leads.empty and p_deals.empty:
+        st.info("No leads or deals recorded for This Month. 🚀")
     else:
         def chart_layout(fig, title=""):
             fig.update_layout(
@@ -379,11 +389,11 @@ with tab_pipeline:
         col1, col2 = st.columns(2)
 
         with col1:
-            st.markdown(f"#### ⏳ Leads by Hour ({date_range})")
-            if not leads.empty:
+            st.markdown("#### ⏳ Leads by Hour (This Month)")
+            if not p_leads.empty:
                 # Group by hour to see when leads are coming in
-                leads["hour"] = leads["created_time"].dt.hour
-                hourly = leads.groupby("hour").size().reset_index(name="Leads")
+                p_leads["hour"] = p_leads["created_time"].dt.hour
+                hourly = p_leads.groupby("hour").size().reset_index(name="Leads")
                 
                 # Ensure all 24 hours are represented for a clean chart
                 all_hours = pd.DataFrame({"hour": range(24)})
@@ -397,9 +407,9 @@ with tab_pipeline:
                 st.info(f"No leads generated during {date_range}.")
 
         with col2:
-            st.markdown(f"#### 🎯 {date_range} Sources")
-            if not leads.empty:
-                src = leads["source"].value_counts().reset_index()
+            st.markdown("#### 🎯 This Month Sources")
+            if not p_leads.empty:
+                src = p_leads["source"].value_counts().reset_index()
                 src.columns = ["Source", "Count"]
                 fig = px.pie(
                     src, values="Count", names="Source", hole=0.65,
@@ -414,10 +424,10 @@ with tab_pipeline:
         col3, col4 = st.columns(2)
 
         with col3:
-            st.markdown(f"#### 👥 Team Performance ({date_range})")
-            if not deals.empty:
-                won_period = deals[deals["stage"].str.contains("closed won", case=False, na=False)]
-                t_total = deals.groupby("owner_name").size().reset_index(name="Touched")
+            st.markdown("#### 👥 Team Performance (This Month)")
+            if not p_deals.empty:
+                won_period = p_deals[p_deals["stage"].str.contains("closed won", case=False, na=False)]
+                t_total = p_deals.groupby("owner_name").size().reset_index(name="Touched")
                 t_won   = won_period.groupby("owner_name").size().reset_index(name="Won") if not won_period.empty else pd.DataFrame(columns=["owner_name", "Won"])
                 
                 team = t_total.merge(t_won, on="owner_name", how="left").infer_objects(copy=False).fillna(0)
@@ -430,12 +440,12 @@ with tab_pipeline:
                 fig.update_layout(legend=dict(orientation="h", y=1.1, x=0, title=""))
                 st.plotly_chart(chart_layout(fig), width="stretch")
             else:
-                st.info(f"No deal activity assigned for {date_range}.")
+                st.info("No deal activity assigned for This Month.")
 
         with col4:
-            st.markdown(f"#### 💰 {date_range} Pipeline Value")
-            if not deals.empty:
-                pv = deals.groupby("stage")["amount"].sum().reset_index().sort_values("amount", ascending=True)
+            st.markdown("#### 💰 This Month Pipeline Value")
+            if not p_deals.empty:
+                pv = p_deals.groupby("stage")["amount"].sum().reset_index().sort_values("amount", ascending=True)
                 fig = px.bar(
                     pv, x="amount", y="stage", orientation="h",
                     color="amount",
@@ -446,12 +456,12 @@ with tab_pipeline:
                 fig.update_coloraxes(showscale=False)
                 st.plotly_chart(chart_layout(fig), width="stretch")
             else:
-                st.info(f"No deals in the pipeline for {date_range}.")
+                st.info("No deals in the pipeline for This Month.")
 
         st.divider()
 
-        st.markdown(f"#### 📰 {date_range} Deal Activity Log")
-        recent = deals.sort_values("created_time", ascending=False).head(20) if not deals.empty else pd.DataFrame()
+        st.markdown("#### 📰 This Month Deal Activity Log")
+        recent = p_deals.sort_values("created_time", ascending=False).head(20) if not p_deals.empty else pd.DataFrame()
         if not recent.empty:
             for _, row in recent.iterrows():
                 is_won  = "won"  in str(row["stage"]).lower()
@@ -501,11 +511,7 @@ with tab_pipeline:
         else:
             st.info(f"No deal activity recorded for {date_range}.")
 
-
-# -----------------------------------------------------
-# AI TAB
-# -----------------------------------------------------
-with tab_ai:
+elif active_tab == "🧠 AI Executive Insights":
     if not ai_table.empty:
         latest = ai_table.iloc[0]
         payload = latest.get("payload", {})
