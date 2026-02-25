@@ -246,6 +246,7 @@ with nav_cols[1]:
         index=0,
         label_visibility="collapsed"
     )
+    
 
 # =====================================================
 # LOAD & PREP DATA
@@ -256,7 +257,10 @@ try:
         start_utc, end_utc, win_start, win_end = get_date_range(date_range)
         
         # Fetch data (now includes all processing and typing)
-        leads, deals, metrics, ai_table, data_source = fetch_filtered_data(date_range)
+        raw_leads, raw_deals, metrics, ai_table, data_source = fetch_filtered_data(date_range)
+        # Make working copies for filter-driven tabs
+        leads = raw_leads.copy()
+        deals = raw_deals.copy()
         
         if data_source == "cache":
             st.warning("📡 Offline Mode: Displaying last successful data snapshot (Supabase unreachable).")
@@ -430,163 +434,167 @@ if active_tab == "⚡ Strategic Pulse":
     st.divider()
 
 elif active_tab == "📊 Pipeline Performance":
-    # Pipeline Performance charts now sync with the global filter
-    m_start, m_end, p_ws, p_we = get_date_range(date_range)
-    st_ts = pd.to_datetime(m_start, utc=True).tz_convert(IST)
-    en_ts = pd.to_datetime(m_end, utc=True).tz_convert(IST) if m_end else None
-    
-    p_leads = leads[leads["created_time"] >= st_ts].copy() if not leads.empty else leads.copy()
-    p_deals = deals[
-        (deals["created_time"] >= st_ts) | 
-        (deals["modified_time"] >= st_ts) |
-        (deals["closed_time"] >= st_ts)
-    ].copy() if not deals.empty else deals.copy()
-    
-    if en_ts:
-        p_leads = p_leads[p_leads["created_time"] < en_ts]
-        p_deals = p_deals[p_deals["created_time"] < en_ts]
-    
-    if p_leads.empty and p_deals.empty:
-        st.info(f"No leads or deals recorded for {date_range}. 🚀")
-    else:
-        def chart_layout(fig, title=""):
-            fig.update_layout(
-                title=dict(text=title, font=dict(size=14, color="#e2e8f0"), x=0),
-                template="plotly_dark",
-                paper_bgcolor="rgba(0,0,0,0)",
-                plot_bgcolor="rgba(0,0,0,0)",
-                margin=dict(l=8, r=8, t=40, b=8),
-                font=dict(family="Inter, sans-serif", color="#94a3b8"),
-                yaxis=dict(gridcolor=GRID, zeroline=False),
-                xaxis=dict(gridcolor=GRID, zeroline=False),
+
+    # =====================================================
+    # IGNORE GLOBAL FILTER — Use FULL RAW DATA
+    # =====================================================
+    now_ist = datetime.now(IST)
+    month_start = now_ist.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    today_start = now_ist.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    # Always use RAW (unfiltered) data
+    full_leads = raw_leads.copy() if not raw_leads.empty else pd.DataFrame()
+    full_deals = raw_deals.copy() if not raw_deals.empty else pd.DataFrame()
+
+    # =====================================================
+    # Monthly Leads (Day 1 → Today)
+    # =====================================================
+    monthly_leads = full_leads[
+        (full_leads["created_time"] >= month_start) &
+        (full_leads["created_time"] <= now_ist)
+    ].copy()
+
+    # =====================================================
+    # Today's Leads (for Sources)
+    # =====================================================
+    today_leads = full_leads[
+        (full_leads["created_time"] >= today_start) &
+        (full_leads["created_time"] <= now_ist)
+    ].copy()
+
+    # =====================================================
+    # Monthly Deals
+    # =====================================================
+    monthly_deals = full_deals[
+        (
+            (full_deals["created_time"] >= month_start) |
+            (full_deals["modified_time"] >= month_start) |
+            (full_deals["closed_time"] >= month_start)
+        )
+    ].copy()
+
+    if monthly_leads.empty and monthly_deals.empty:
+        st.info("No activity recorded this month.")
+        st.stop()
+
+    # =====================================================
+    # Chart Helper
+    # =====================================================
+    def chart_layout(fig):
+        fig.update_layout(
+            template="plotly_dark",
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            margin=dict(l=8, r=8, t=30, b=8),
+            font=dict(family="Inter, sans-serif", color="#94a3b8"),
+            yaxis=dict(gridcolor=GRID, zeroline=False),
+            xaxis=dict(gridcolor=GRID, zeroline=False),
+        )
+        return fig
+
+    # =====================================================
+    # Row 1 — Leads This Month + Lead Sources Today
+    # =====================================================
+    col1, col2 = st.columns(2)
+
+    # ---- Leads This Month ----
+    with col1:
+        st.markdown("#### 📈 Leads This Month")
+
+        monthly_leads["day"] = monthly_leads["created_time"].dt.date
+        daily = monthly_leads.groupby("day").size().reset_index(name="Leads")
+
+        full_range = pd.date_range(
+            start=month_start.date(),
+            end=now_ist.date()
+        )
+
+        full_df = pd.DataFrame({"day": full_range.date})
+        daily = full_df.merge(daily, on="day", how="left").fillna(0)
+
+        fig = px.line(daily, x="day", y="Leads")
+
+        fig.update_traces(
+            line_shape="spline",
+            line=dict(color=PRIMARY, width=3),
+            fill="tozeroy",
+            fillcolor="rgba(139, 92, 246, 0.25)"
+        )
+
+        fig.update_layout(height=360, hovermode="x unified")
+
+        st.plotly_chart(chart_layout(fig), use_container_width=True)
+
+    # ---- Lead Sources Today ----
+    with col2:
+        st.markdown("#### 🎯 Lead Sources (Today)")
+
+        if not today_leads.empty:
+            src = today_leads["source"].value_counts().reset_index()
+            src.columns = ["Source", "Count"]
+
+            fig = px.pie(
+                src,
+                values="Count",
+                names="Source",
+                hole=0.65,
+                color_discrete_sequence=[PRIMARY, CYAN, ACCENT, SUCCESS, DANGER, SECONDARY]
             )
-            return fig
 
-        col1, col2 = st.columns(2)
+            fig.update_traces(
+                textinfo="percent",
+                marker=dict(line=dict(color=BG, width=3))
+            )
 
-        with col1:
-            st.markdown(f"#### 📅 Lead Distribution ({date_range})")
-            if not p_leads.empty:
-                # Group by day
-                p_leads["day"] = p_leads["created_time"].dt.date
-                daily = p_leads.groupby("day").size().reset_index(name="Leads")
-                
-                # Fill missing days in current month up to 'today' or end of month
-                month_days = pd.date_range(start=st_ts.date(), end=datetime.now(IST).date())
-                all_days = pd.DataFrame({"day": month_days.date})
-                daily = all_days.merge(daily, on="day", how="left").fillna(0)
-                
-                fig = px.bar(daily, x="day", y="Leads", color_discrete_sequence=[PRIMARY], text_auto=True)
-                fig.update_traces(marker_line_width=0, marker_color=PRIMARY)
-                fig.update_xaxes(tickformat="%d %b", title="")
-                st.plotly_chart(chart_layout(fig), width="stretch")
-            else:
-                st.info("No leads generated this month.")
-
-        with col2:
-            st.markdown(f"#### 🎯 Sources ({date_range})")
-            if not p_leads.empty:
-                src = p_leads["source"].value_counts().reset_index()
-                src.columns = ["Source", "Count"]
-                fig = px.pie(
-                    src, values="Count", names="Source", hole=0.65,
-                    color_discrete_sequence=[PRIMARY, CYAN, ACCENT, SUCCESS, DANGER, SECONDARY]
-                )
-                fig.update_traces(textfont_size=12, textinfo='percent', marker=dict(line=dict(color=BG, width=3)))
-                fig.update_layout(legend=dict(orientation="h", y=-0.15))
-                st.plotly_chart(chart_layout(fig), width="stretch")
-
-        st.divider()
-
-        col3, col4 = st.columns(2)
-
-        with col3:
-            st.markdown(f"#### 👥 Team Performance ({date_range})")
-            if not p_deals.empty:
-                won_period = p_deals[p_deals["stage"].str.contains("closed won", case=False, na=False)]
-                t_total = p_deals.groupby("owner_name").size().reset_index(name="Touched")
-                t_won   = won_period.groupby("owner_name").size().reset_index(name="Won") if not won_period.empty else pd.DataFrame(columns=["owner_name", "Won"])
-                
-                team = t_total.merge(t_won, on="owner_name", how="left").infer_objects(copy=False).fillna(0)
-                fig = px.bar(
-                    team, x="owner_name", y=["Touched", "Won"],
-                    barmode="group",
-                    color_discrete_map={"Touched": SECONDARY, "Won": SUCCESS},
-                    text_auto='.2s'
-                )
-                fig.update_layout(legend=dict(orientation="h", y=1.1, x=0, title=""))
-                st.plotly_chart(chart_layout(fig), width="stretch")
-            else:
-                st.info("No deal activity assigned this month.")
-
-        with col4:
-            st.markdown(f"#### 💰 Pipeline Value ({date_range})")
-            if not p_deals.empty:
-                pv = p_deals.groupby("stage")["amount"].sum().reset_index().sort_values("amount", ascending=True)
-                fig = px.bar(
-                    pv, x="amount", y="stage", orientation="h",
-                    color="amount",
-                    color_continuous_scale=[[0, SECONDARY], [0.5, PRIMARY], [1, CYAN]],
-                    text=pv["amount"].apply(lambda x: human_format(x, True))
-                )
-                fig.update_traces(textposition='outside')
-                fig.update_coloraxes(showscale=False)
-                st.plotly_chart(chart_layout(fig), width="stretch")
-            else:
-                st.info("No deals in the pipeline this month.")
-
-        st.divider()
-
-        st.markdown(f"#### 📰 Deal Activity Log ({date_range})")
-        recent = p_deals.sort_values("created_time", ascending=False).head(20) if not p_deals.empty else pd.DataFrame()
-        if not recent.empty:
-            for _, row in recent.iterrows():
-                is_won  = "won"  in str(row["stage"]).lower()
-                is_lost = "lost" in str(row["stage"]).lower()
-                badge_color = SUCCESS if is_won else DANGER if is_lost else ACCENT
-                
-                # Show full date if not Today
-                if date_range == "Today":
-                    time_str = row["created_time"].strftime("%I:%M %p")
-                else:
-                    time_str = row["created_time"].strftime("%b %d, %I:%M %p")
-                
-                st.markdown(f"""
-                <div style="display:flex; align-items:center; justify-content:space-between;
-                            background: {CARD_BG}; border:1px solid rgba(255,255,255,0.04);
-                            border-radius:12px; padding:16px 20px; margin-bottom:12px;
-                            box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                    <div style="display:flex; align-items:center; gap:16px;">
-                        <div style="width:42px; height:42px; border-radius:12px;
-                                    background:{badge_color}22; display:flex;
-                                    align-items:center; justify-content:center;
-                                    font-size:1.2rem; border: 1px solid {badge_color}44;">
-                            {"✅" if is_won else "❌" if is_lost else "🔄"}
-                        </div>
-                        <div>
-                            <p style="margin:0; font-size:0.95rem; font-weight:600; color:#f8fafc;">
-                                {row.get("deal_name","Unnamed Deal")}
-                            </p>
-                            <p style="margin:4px 0 0 0; font-size:0.8rem; color:#94a3b8;">
-                                👤 {row.get("owner_name","Unassigned")} &nbsp;·&nbsp; ⏱️ {time_str}
-                            </p>
-                        </div>
-                    </div>
-                    <div style="text-align:right;">
-                        <p style="margin:0 0 6px 0; font-size:1.05rem; font-weight:700; color:{SUCCESS};">
-                            {human_format(row["amount"], True)}
-                        </p>
-                        <span style="background:{badge_color}15; color:{badge_color};
-                                     font-size:0.7rem; font-weight:700; letter-spacing:0.05em;
-                                     padding:4px 12px; border-radius:99px; text-transform:uppercase;
-                                     border: 1px solid {badge_color}33;">
-                            {row["stage"]}
-                        </span>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
+            st.plotly_chart(chart_layout(fig), use_container_width=True)
         else:
-            st.info(f"No deal activity recorded for {date_range}.")
+            st.info("No leads recorded today.")
+
+    st.divider()
+
+    # =====================================================
+    # Pipeline Value (Monthly)
+    # =====================================================
+    st.markdown("#### 💰 Pipeline Value This Month")
+
+    if not monthly_deals.empty:
+        pv = (
+            monthly_deals
+            .groupby("stage")["amount"]
+            .sum()
+            .reset_index()
+            .sort_values("amount", ascending=True)
+        )
+
+        fig = px.bar(
+            pv,
+            x="amount",
+            y="stage",
+            orientation="h",
+            color="amount",
+            color_continuous_scale=[[0, SECONDARY], [0.5, PRIMARY], [1, CYAN]]
+        )
+
+        fig.update_coloraxes(showscale=False)
+
+        st.plotly_chart(chart_layout(fig), use_container_width=True)
+    else:
+        st.info("No deals in pipeline this month.")
+
+    st.divider()
+
+    # =====================================================
+    # Deal Activity (Monthly)
+    # =====================================================
+    st.markdown("#### 📰 Deal Activity (This Month)")
+
+    recent = monthly_deals.sort_values("created_time", ascending=False).head(20)
+
+    if not recent.empty:
+        for _, row in recent.iterrows():
+            st.markdown(
+                f"• **{row.get('deal_name','Deal')}** — {human_format(row['amount'], True)} ({row['stage']})"
+            )
 
 elif active_tab == "🧠 AI Executive Insights":
     # AI Insights strictly follow a "Today-only" visibility policy as requested
@@ -629,3 +637,4 @@ elif active_tab == "🧠 AI Executive Insights":
             </p>
         </div>
         """, unsafe_allow_html=True)
+

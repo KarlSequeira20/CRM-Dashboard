@@ -64,38 +64,38 @@ export async function generateInsights(jsonPayload) {
   }
 
   const prompt = `
-Role: Strict Revenue Intelligence Analyst.
-Objective: Analyze the CRM metrics below and provide a detailed, high-stakes strategic briefing.
+Role: Strict Revenue Analyst.
+Objective: Identify the single most significant trend or bottleneck in the data.
 
 DATA TO ANALYZE:
 ${englishData}
 
 --------------------------------------------------
-STRICT OUTPUT FORMAT:
-You MUST provide the following 5 sections. Be detailed but data-anchored.
+STRICT OUTPUT FORMAT (START IMMEDIATELY WITH "Primary Driver:"):
 
 Primary Driver:
-[2-3 clear, informative sentences explaining the main issue or driver based ONLY on the data.]
+[Identify the biggest % change or funnel drop-off. Explain it in 2 short sentences.]
 
 Supporting Evidence:
-- [Fact 1 with specific numbers/changes from the data]
-- [Fact 2 with specific numbers/changes from the data]
+- [Reference the primary metric and its % change]
+- [Reference the specific funnel stage or lead source volume]
 
 Contradiction Check:
-[1-2 sentences explaining why other metrics do not contradict this driver, using the provided data.]
+[State why the other metrics (like Win Rate or Pipeline Value) don't disprove the Primary Driver.]
 
 Operational Impact:
-[2-3 clear sentences on how this affects the business revenue or pipeline.]
+[State exactly how this trend will change the total revenue or sales workload this week.]
 
 Immediate Diagnostic Actions:
-- [Diagnostic Step 1: Specific to the data provided]
-- [Diagnostic Step 2: Specific to the data provided]
+- [Action 1: Review the specific source or funnel stage identified above]
+- [Action 2: Compare today's conversion rate against the 7-day average]
 
+--------------------------------------------------
 RULES:
-1. NO EXTERNAL CITATIONS. Do not mention HubSpot, Salesforce, or external studies.
-2. NO FILLER. Start immediately with "Primary Driver:".
-3. ANCHOR TO DATA. Use the specific percentages and values from the metrics.
-4. MAX 1400 CHARACTERS. Keep sentences extremely brief to ensure WhatsApp delivery.
+1. NO PREAMBLE. No "Here is the analysis."
+2. DATA ONLY. If a number isn't in the list, do not use it.
+3. BE BRUTAL. If leads are down, call it a "Volume Crisis." If conversion is low, call it "Funnel Inefficiency."
+4. KEEP IT SHORT. Use bullet points. Maximum 1000 characters.
 `.trim();
 
   // Force Ollama to return JSON (works with llama3.2+ when format="json" is passed)
@@ -188,44 +188,56 @@ export async function generateVizInsights(vizPayload) {
 }
 
 export async function generateWhatsAppSummary(jsonPayload) {
+  // Pre-formatting values to save model tokens
+  const leadChange = jsonPayload.new_leads_change_percent >= 0 ? `+${jsonPayload.new_leads_change_percent}` : jsonPayload.new_leads_change_percent;
+  const pipeValue = (jsonPayload.pipeline.total_value / 100000).toFixed(1);
+  const pipeChange = jsonPayload.pipeline.change_percent >= 0 ? `+${jsonPayload.pipeline.change_percent}` : jsonPayload.pipeline.change_percent;
+
+  // Inside your prompt string...
   const prompt = `
-Role: Strict Revenue Intelligence Analyst.
-Objective: Summarize the daily CRM metrics into a structured 3-point WhatsApp briefing.
+Role: Strategic Revenue Intelligence Analyst.
 
---------------------------------------------------
-STRICT OUTPUT FORMAT EXAMPLE:
-📊 Daily CRM Summary – [Month Day]
-• New Leads: [Number] ([Change]% vs avg)
-• Deals Won: [Number]
-• Pipeline: [Value]
+Objective:
+Provide a tactical directive for a massive growth day.
 
-⚠ Signals:
-– [Specific anomaly 1 from data]
-– [Specific anomaly 2 from data]
-
-👉 Focus:
-– [Specific action 1 based on data]
-– [Specific action 2 based on data]
---------------------------------------------------
-
-RULES:
-1. NO FILLER. START IMMEDIATELY with the chart emoji.
-2. ANCHOR TO DATA. Use the specific percentages and values provided.
-3. MAX 400 CHARACTERS. Keep it concise for mobile reading.
+STRICT OUTPUT RULES:
+- Do NOT use markdown.
+- Do NOT use asterisks (*).
+- Do NOT use bold or italic formatting.
+- Do NOT add extra headings.
+- Do NOT add explanations outside the defined format.
+- Follow the exact structure below.
+- Output plain text only.
 
 DATA:
-- Date: ${jsonPayload.date}
-- New Leads Today: ${jsonPayload.new_leads_today} (${jsonPayload.new_leads_change_percent}% vs 7-day avg)
-- Deals Won Today: ${jsonPayload.pipeline.closed_won_today}
-- Pipeline Value: ₹${(jsonPayload.pipeline.total_value / 100000).toFixed(1)}L (${jsonPayload.pipeline.change_percent}% vs avg)
-- Funnel: Leads(${jsonPayload.funnel.leads}) -> Won(${jsonPayload.funnel.won})
-- Conv Rate: ${jsonPayload.funnel.conversion_rate}%
-- Anomalies: ${JSON.stringify(jsonPayload.anomaly_flags)}
+- Leads: ${jsonPayload.new_leads_today} (+${jsonPayload.new_leads_change_percent}%)
+- Pipeline: ₹${pipeValue}L (+${pipeChange}%)
+- Conversion: ${jsonPayload.funnel.conversion_rate}%
+
+DIRECTIVE LOGIC:
+If Leads AND Pipeline are BOTH surging:
+Strategic Solution = Priority Tiering.
+Focus Action = Move to tier-based routing.
+Execution = Assign high-value pipeline deals to senior reps only.
+
+OUTPUT FORMAT (FOLLOW EXACTLY):
+
+📊 Daily CRM Summary – ${jsonPayload.date}
+• New Leads: ${jsonPayload.new_leads_today}
+• Deals Won: ${jsonPayload.deals_won_today}
+• Pipeline: ₹${pipeValue}L
+
+⚠ Strategic Signal:
+– Identify the growth surge clearly in one sentence.
+
+🚀 Tactical Solution:
+– Provide the exact tiering execution action in one clear sentence.
 `.trim();
+
 
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 30000);
+    const timeout = setTimeout(() => controller.abort(), 15000); // Shorter timeout for 1B
 
     const response = await fetch(`${config.ollama.baseUrl}/api/generate`, {
       method: "POST",
@@ -235,8 +247,8 @@ DATA:
         prompt: prompt,
         stream: false,
         options: {
-          temperature: 0.1,
-          num_predict: 200
+          temperature: 0.1, // Keep it deterministic
+          num_predict: 150
         }
       }),
       signal: controller.signal
@@ -247,9 +259,8 @@ DATA:
     return { text: data.response.trim() };
   } catch (error) {
     console.error("[Ollama Client] WhatsApp Summary failed.", error.message);
-    const val = (jsonPayload.pipeline.total_value / 100000).toFixed(1);
     return {
-      text: `� Daily CRM Summary\n• New Leads: ${jsonPayload.new_leads_today}\n• Deals Won: ${jsonPayload.pipeline.closed_won_today}\n• Pipeline: ₹${val}L\n\nCheck dashboard for full strategic briefing! 💠`
+      text: `📊 Daily CRM Summary\n• New Leads: ${jsonPayload.new_leads_today}\n• Deals Won: ${jsonPayload.pipeline.closed_won_today}\n• Pipeline: ₹${pipeValue}L\n\n⚠ Signal: Dashboard check required.\n👉 Focus: Manual review of funnel.`
     };
   }
 }
