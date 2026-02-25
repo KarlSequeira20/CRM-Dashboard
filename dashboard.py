@@ -354,7 +354,7 @@ if active_tab == "⚡ Strategic Pulse":
     st.divider()
 
 elif active_tab == "📊 Pipeline Performance":
-    # Pipeline Performance defaults to "This Month" to stay relevant
+    # Pipeline Performance charts default to "This Month" as requested
     m_start, m_end = get_date_range("This Month")
     st_ts = pd.to_datetime(m_start, utc=True).tz_convert(IST)
     en_ts = pd.to_datetime(m_end, utc=True).tz_convert(IST) if m_end else None
@@ -389,25 +389,26 @@ elif active_tab == "📊 Pipeline Performance":
         col1, col2 = st.columns(2)
 
         with col1:
-            st.markdown("#### ⏳ Leads by Hour (This Month)")
+            st.markdown("#### 📅 Daily Lead Distribution (This Month)")
             if not p_leads.empty:
-                # Group by hour to see when leads are coming in
-                p_leads["hour"] = p_leads["created_time"].dt.hour
-                hourly = p_leads.groupby("hour").size().reset_index(name="Leads")
+                # Group by day
+                p_leads["day"] = p_leads["created_time"].dt.date
+                daily = p_leads.groupby("day").size().reset_index(name="Leads")
                 
-                # Ensure all 24 hours are represented for a clean chart
-                all_hours = pd.DataFrame({"hour": range(24)})
-                hourly = all_hours.merge(hourly, on="hour", how="left").fillna(0)
+                # Fill missing days in current month up to 'today' or end of month
+                month_days = pd.date_range(start=st_ts.date(), end=datetime.now(IST).date())
+                all_days = pd.DataFrame({"day": month_days.date})
+                daily = all_days.merge(daily, on="day", how="left").fillna(0)
                 
-                fig = px.area(hourly, x="hour", y="Leads", color_discrete_sequence=[PRIMARY])
-                fig.update_traces(fill="tozeroy", line=dict(color=PRIMARY, width=3), fillcolor="rgba(139,92,246,0.15)")
-                fig.update_xaxes(tickmode='linear', tick0=0, dtick=3, title="Hour of Day (IST)")
+                fig = px.bar(daily, x="day", y="Leads", color_discrete_sequence=[PRIMARY], text_auto=True)
+                fig.update_traces(marker_line_width=0, marker_color=PRIMARY)
+                fig.update_xaxes(tickformat="%d %b", title="")
                 st.plotly_chart(chart_layout(fig), width="stretch")
             else:
-                st.info(f"No leads generated during {date_range}.")
+                st.info("No leads generated this month.")
 
         with col2:
-            st.markdown("#### 🎯 This Month Sources")
+            st.markdown("#### 🎯 Sources (This Month)")
             if not p_leads.empty:
                 src = p_leads["source"].value_counts().reset_index()
                 src.columns = ["Source", "Count"]
@@ -418,33 +419,6 @@ elif active_tab == "📊 Pipeline Performance":
                 fig.update_traces(textfont_size=12, textinfo='percent', marker=dict(line=dict(color=BG, width=3)))
                 fig.update_layout(legend=dict(orientation="h", y=-0.15))
                 st.plotly_chart(chart_layout(fig), width="stretch")
-
-        st.divider()
-
-        st.markdown("#### 📅 Daily Lead Generation (This Month)")
-        if not p_leads.empty:
-            # Extract date only for grouping
-            p_leads["date"] = p_leads["created_time"].dt.date
-            daily_leads = p_leads.groupby("date").size().reset_index(name="Lead Count")
-            daily_leads = daily_leads.sort_values("date", ascending=False)
-            
-            # Use columns for a more focused table view
-            t1, t2 = st.columns([2, 1])
-            with t1:
-                st.dataframe(
-                    daily_leads,
-                    column_config={
-                        "date": st.column_config.DateColumn("Date", format="DD MMM YYYY"),
-                        "Lead Count": st.column_config.NumberColumn("Leads", format="%d 👤")
-                    },
-                    hide_index=True,
-                    width="stretch"
-                )
-            with t2:
-                avg_daily = daily_leads["Lead Count"].mean()
-                max_daily = daily_leads["Lead Count"].max()
-                st.metric("Avg Leads / Day", f"{avg_daily:.1f}")
-                st.metric("Peak Day", f"{int(max_daily)}")
 
         st.divider()
 
@@ -467,10 +441,10 @@ elif active_tab == "📊 Pipeline Performance":
                 fig.update_layout(legend=dict(orientation="h", y=1.1, x=0, title=""))
                 st.plotly_chart(chart_layout(fig), width="stretch")
             else:
-                st.info("No deal activity assigned for This Month.")
+                st.info("No deal activity assigned this month.")
 
         with col4:
-            st.markdown("#### 💰 This Month Pipeline Value")
+            st.markdown("#### 💰 Pipeline Value (This Month)")
             if not p_deals.empty:
                 pv = p_deals.groupby("stage")["amount"].sum().reset_index().sort_values("amount", ascending=True)
                 fig = px.bar(
@@ -483,11 +457,11 @@ elif active_tab == "📊 Pipeline Performance":
                 fig.update_coloraxes(showscale=False)
                 st.plotly_chart(chart_layout(fig), width="stretch")
             else:
-                st.info("No deals in the pipeline for This Month.")
+                st.info("No deals in the pipeline this month.")
 
         st.divider()
 
-        st.markdown("#### 📰 This Month Deal Activity Log")
+        st.markdown("#### 📰 Deal Activity Log (This Month)")
         recent = p_deals.sort_values("created_time", ascending=False).head(20) if not p_deals.empty else pd.DataFrame()
         if not recent.empty:
             for _, row in recent.iterrows():
