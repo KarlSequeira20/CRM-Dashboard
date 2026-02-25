@@ -142,6 +142,14 @@ def get_date_range(option):
     elif option == "Last Year":
         start = now.replace(year=now.year-1, month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
         end = now.replace(year=now.year, month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+    elif option == "Last Month":
+        first_of_this = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        end = first_of_this
+        start = (first_of_this - timedelta(days=1)).replace(day=1)
+    elif option == "Day Before Yesterday":
+        yesterday_start = now.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=1)
+        end = yesterday_start
+        start = yesterday_start - timedelta(days=1)
     
     # Convert to UTC ISO for Supabase
     start_utc = start.astimezone(timezone.utc).isoformat() if start else None
@@ -307,37 +315,74 @@ if active_tab == "⚡ Strategic Pulse":
         t_nego    = safe_i(m.get("negotiations_active", 0))
         t_prop    = safe_i(m.get("proposals_sent", 0))
         avg_deal  = (rev_won / t_won) if t_won > 0 else 0
-    else:
-        # Calculate from already globally-filtered leads/deals
-        won_deals = deals[deals["stage"].str.contains("closed won", case=False, na=False)] if not deals.empty else pd.DataFrame()
-        lost_deals = deals[deals["stage"].str.contains("closed lost", case=False, na=False)] if not deals.empty else pd.DataFrame()
+    def get_comparison(leads_df, deals_df):
+        won = deals_df[deals_df["stage"].str.contains("closed won", case=False, na=False)] if not deals_df.empty else pd.DataFrame()
+        lost = deals_df[deals_df["stage"].str.contains("closed lost", case=False, na=False)] if not deals_df.empty else pd.DataFrame()
+        nego = deals_df[deals_df["stage"].str.contains("negotiation", case=False, na=False)] if not deals_df.empty else pd.DataFrame()
+        prop = deals_df[deals_df["stage"].str.contains("proposal|quote", case=False, na=False)] if not deals_df.empty else pd.DataFrame()
         
-        t_leads   = len(leads)
-        t_won     = len(won_deals)
-        rev_won   = won_deals["amount"].sum() if not won_deals.empty else 0
-        rev_lost  = lost_deals["amount"].sum() if not lost_deals.empty else 0
-        t_rev     = deals["amount"].sum() if not deals.empty else 0 # Total Volume touched
-        win_rate  = (rev_won / (rev_won + rev_lost) * 100) if (rev_won + rev_lost) > 0 else 0
-        t_nego    = len(deals[deals["stage"].str.contains("negotiation", case=False, na=False)]) if not deals.empty else 0
-        t_prop    = len(deals[deals["stage"].str.contains("proposal|quote", case=False, na=False)]) if not deals.empty else 0
-        avg_deal  = (rev_won / t_won) if t_won > 0 else 0
+        rw = won["amount"].sum() if not won.empty else 0
+        rl = lost["amount"].sum() if not lost.empty else 0
+        
+        return {
+            "leads": len(leads_df),
+            "won_count": len(won),
+            "rev_won": rw,
+            "rev_lost": rl,
+            "rev_touched": deals_df["amount"].sum() if not deals_df.empty else 0,
+            "win_rate": (rw / (rw + rl) * 100) if (rw + rl) > 0 else 0,
+            "nego": len(nego),
+            "prop": len(prop),
+            "avg_deal": (rw / len(won)) if not won.empty else 0
+        }
+
+    # Current Metrics
+    curr = get_comparison(leads, deals)
+
+    # Fetch Comparison Data
+    comp_range = None
+    if date_range == "Today": comp_range = "Yesterday"
+    elif date_range == "Yesterday": comp_range = "Day Before Yesterday"
+    elif date_range == "This Month": comp_range = "Last Month"
+
+    prev = None
+    if comp_range:
+        try:
+            p_leads, p_deals, p_met, p_ai, _ = fetch_filtered_data(comp_range)
+            # Ensure proper typing
+            if not p_deals.empty:
+                p_deals["amount"] = pd.to_numeric(p_deals["amount"], errors="coerce").fillna(0)
+                p_deals["stage"] = p_deals["stage"].astype(str)
+            prev = get_comparison(p_leads, p_deals)
+        except:
+            pass
+
+    def get_delta(key, is_percent=False):
+        if not prev: return None
+        c_val = curr[key]
+        p_val = prev[key]
+        if p_val == 0: return f"+{c_val}" if c_val > 0 else None
+        diff = c_val - p_val
+        if is_percent: return f"{diff:.1f}%"
+        perc = (diff / p_val) * 100
+        return f"{perc:+.1f}%"
 
     st.markdown(f"#### ⚡ {date_range} Performance")
     k1, k2, k3, k4, k5 = st.columns(5)
-    k1.metric("🆕 New Leads",           human_format(t_leads))
-    k2.metric("🤝 Active Negotiations",  human_format(t_nego))
-    k3.metric("🏆 Deals Won",           human_format(t_won))
-    k4.metric("💰 Revenue Won",         human_format(rev_won, True))
-    k5.metric("📉 Revenue Lost",        human_format(rev_lost, True))
+    k1.metric("🆕 New Leads",           human_format(curr["leads"]),      delta=get_delta("leads"))
+    k2.metric("🤝 Active Negotiations",  human_format(curr["nego"]),       delta=get_delta("nego"))
+    k3.metric("🏆 Deals Won",           human_format(curr["won_count"]),  delta=get_delta("won_count"))
+    k4.metric("💰 Revenue Won",         human_format(curr["rev_won"], True), delta=get_delta("rev_won"))
+    k5.metric("📉 Revenue Lost",        human_format(curr["rev_lost"], True), delta=get_delta("rev_lost"))
 
     st.divider()
 
     st.markdown("#### 🏁 Period Outcomes")
     d1, d2, d3, d4 = st.columns(4)
-    d1.metric("💵 Revenue Touched",      human_format(t_rev, True))
-    d2.metric("📊 Period Win Rate",      f"{win_rate:.1f}%")
-    d3.metric("📄 Proposals Sent",       human_format(t_prop))
-    d4.metric("🎯 Avg Deal Size",        human_format(avg_deal, True))
+    d1.metric("💵 Revenue Touched",      human_format(curr["rev_touched"], True), delta=get_delta("rev_touched"))
+    d2.metric("📊 Period Win Rate",      f"{curr['win_rate']:.1f}%",           delta=get_delta("win_rate", True))
+    d3.metric("📄 Proposals Sent",       human_format(curr["prop"]),           delta=get_delta("prop"))
+    d4.metric("🎯 Avg Deal Size",        human_format(curr["avg_deal"], True), delta=get_delta("avg_deal"))
 
     st.divider()
 
