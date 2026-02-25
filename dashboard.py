@@ -585,35 +585,43 @@ elif active_tab == "📊 Pipeline Performance":
             st.info(f"No deal activity recorded for {date_range}.")
 
 elif active_tab == "🧠 AI Executive Insights":
-    # AI Insights strictly follow a "Today-only" policy as requested
-    ai_data = ai_table
-    if date_range != "Today":
-        with st.spinner("🧠 Adjusting for Daily Strategy..."):
-            _, _, _, ai_data, _ = fetch_filtered_data("Today")
+    # AI Insights strictly follow a "Today-only" visibility policy as requested
+    if date_range == "Today":
+        if not ai_table.empty:
+            latest = ai_table.iloc[0]
+            payload = latest.get("payload", {})
+            summary = payload.get("aiSummary", {}).get("text", "No summary available")
 
-    if not ai_data.empty:
-        latest = ai_data.iloc[0]
-        payload = latest.get("payload", {})
-        summary = payload.get("aiSummary", {}).get("text", "No summary available")
-
+            st.markdown(f"""
+            <div style="background: linear-gradient(145deg, {CARD_BG}, rgba(15,23,42,0.8)); 
+                        padding: 32px; border-radius: 20px; border: 1px solid {BORDER};
+                        box-shadow: 0 10px 30px -10px rgba(0,0,0,0.3);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h3 style="margin:0;" class="gradient-header">
+                        ✨ Daily Strategic Briefing
+                    </h3>
+                    <span style="background:{ACCENT}22; color:{ACCENT}; font-size:0.75rem; 
+                                 font-weight:700; padding:4px 12px; border-radius:99px; 
+                                 border:1px solid {ACCENT}44; text-transform:uppercase;">
+                        Status: Live
+                    </span>
+                </div>
+                <div style="line-height: 1.7; font-size: 1.05rem; color: #e2e8f0;">
+                    {summary}
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.info("No AI insights generated for Today yet. 🚀")
+    else:
+        # Show contextual help when on other periods
         st.markdown(f"""
-        <div style="background: linear-gradient(145deg, {CARD_BG}, rgba(15,23,42,0.8)); 
-                    padding: 32px; border-radius: 20px; border: 1px solid {BORDER};
-                    box-shadow: 0 10px 30px -10px rgba(0,0,0,0.3);">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                <h3 style="margin:0;" class="gradient-header">
-                    ✨ Daily Strategic Briefing
-                </h3>
-                <span style="background:{ACCENT}22; color:{ACCENT}; font-size:0.75rem; 
-                             font-weight:700; padding:4px 12px; border-radius:99px; 
-                             border:1px solid {ACCENT}44; text-transform:uppercase;">
-                    Focus: Today
-                </span>
-            </div>
-            <div style="line-height: 1.7; font-size: 1.05rem; color: #e2e8f0;">
-                {summary}
-            </div>
+        <div style="text-align:center; padding: 60px 20px; background: {CARD_BG}; border-radius: 20px; border: 1px dashed {BORDER};">
+            <h1 style="font-size: 3rem; margin-bottom: 20px;">🗓️</h1>
+            <h3 style="color:#f8fafc; margin-bottom: 12px;">Strategic Narrative locked to "Today"</h3>
+            <p style="color:#94a3b8; max-width: 500px; margin: 0 auto; line-height: 1.6;">
+                AI Strategic Briefings are precision-tuned for your daily pulse. 
+                Switch the <b>Period Filter</b> to <b>Today</b> to unlock your latest insights and action items.
+            </p>
         </div>
         """, unsafe_allow_html=True)
-    else:
-        st.info("No AI insights generated for Today yet. 🚀")
