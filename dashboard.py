@@ -14,6 +14,14 @@ import json
 # Silence Pandas downcasting warning
 pd.set_option('future.no_silent_downcasting', True)
 
+def refresh():
+    st.cache_data.clear()
+    try:
+        # Call the backend sync trigger
+        requests.post("http://localhost:3001/api/ai/trigger", timeout=5)
+    except:
+        pass
+
 def human_format(num, is_currency=False):
     if num is None: return "0"
     prefix = "₹ " if is_currency else ""
@@ -175,30 +183,55 @@ def fetch_filtered_data(range_label):
             )
         raise ConnectionError(f"Backend unreachable and no local cache found. {str(e)}")
 
-def refresh():
-    st.cache_data.clear()
-    try:
-        requests.post("http://localhost:3001/api/ai/trigger", timeout=120)
-    except:
-        pass
+    # Centers the entire dashboard content for better balance on large screens
+    st.markdown("""
+        <style>
+            .block-container {
+                max-width: 1200px;
+                padding-left: 2rem;
+                padding-right: 2rem;
+            }
+        </style>
+    """, unsafe_allow_html=True)
 
 # =====================================================
 # HEADER
 # =====================================================
-c1, c2, c3 = st.columns([5, 3, 2])
-c1.markdown("<h2 class='gradient-header'>💠 Aha CRM Intelligence</h2>", unsafe_allow_html=True)
+# More balanced header columns
+c1, c2 = st.columns([10, 2])
+c1.markdown("<h2 class='gradient-header' style='margin-bottom:0;'>💠 Aha CRM Intelligence</h2>", unsafe_allow_html=True)
 
-date_range = c2.selectbox(
-    "Filter View",
-    ["Today", "Yesterday", "This Month", "This Year", "Last Year", "All Time"],
-    index=0,
-    label_visibility="collapsed"
-)
-
-if c3.button("🔄 Sync AI / Cache", width="stretch"):
+if c2.button("🔄 Sync AI / Cache", width="stretch"):
     refresh()
 
 st.divider()
+
+# -----------------------------------------------------
+# TABS & FILTER ROW
+# -----------------------------------------------------
+# We use columns to put the filter on the same line as the tab headers
+# -----------------------------------------------------
+# TABS & FILTER ROW
+# -----------------------------------------------------
+# Tighter column logic to prevent "off-centered" feel
+tc1, tc2 = st.columns([10, 2])
+
+with tc2:
+    # Adjusting vertical alignment to match the tab labels precisely
+    st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
+    date_range = st.selectbox(
+        "Period Filter",
+        ["Today", "Yesterday", "This Month", "This Year", "Last Year", "All Time"],
+        index=0,
+        label_visibility="collapsed"
+    )
+
+with tc1:
+    tab_today, tab_pipeline, tab_ai = st.tabs([
+        "⚡ Strategic Pulse",
+        "📊 Pipeline Performance",
+        "🧠 AI Executive Insights"
+    ])
 
 # =====================================================
 # LOAD & PREP DATA
@@ -252,14 +285,8 @@ except Exception as e:
     st.warning("🔄 Please check your internet connection and ensure your Supabase project is active.")
     st.stop()
 
-# =====================================================
-# TABS
-# =====================================================
-tab_today, tab_pipeline, tab_ai = st.tabs([
-    "⚡ Strategic Pulse",
-    "📊 Pipeline Performance",
-    "🧠 AI Executive Insights"
-])
+# Define Tab Objects (Inside tc1 to keep filter on same line)
+# Note: Data loading moved UP to before tab rendering
 
 # -----------------------------------------------------
 # STRATEGIC PULSE TAB
