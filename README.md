@@ -61,8 +61,22 @@ The system follows a modular, decoupled architecture to ensure scalability and r
 
 ## 📂 Project Structure
 
+## 📂 Project Structure
 
-<pre> ## 📂 Project Structure ```bash AHA Smart Homes Project/ ├── backend/ │ ├── src/ │ │ ├── ai/ollamaClient.js # Local LLM integration & prompt engineering │ │ ├── analytics/metrics.js # Revenue & Funnel calculation logic │ │ ├── api/ # Express.js REST endpoints & Webhooks │ │ ├── auth/zohoAuth.js # OAuth 2.0 flow & token rotation │ │ ├── ingestion/syncService.js # Incremental Zoho data extraction │ │ ├── scheduler/index.js # Main pipeline orchestrator (Cron) │ │ └── whatsapp/twilioClient.js # WhatsApp notification dispatcher │ └── .env # Environment configuration └── dashboard.py # Streamlit Executive Dashboard ``` </pre>
+```bash
+AHA Smart Homes Project/
+├── backend/
+│   ├── src/
+│   │   ├── ai/ollamaClient.js
+│   │   ├── analytics/metrics.js
+│   │   ├── api/
+│   │   ├── auth/zohoAuth.js
+│   │   ├── ingestion/syncService.js
+│   │   ├── scheduler/index.js
+│   │   └── whatsapp/twilioClient.js
+│   └── .env
+└── dashboard.py
+```
 
 ## ⚙️ Setup & Installation
 
