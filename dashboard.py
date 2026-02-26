@@ -320,28 +320,48 @@ if active_tab == "⚡ Strategic Pulse":
         t_prop    = safe_i(m.get("proposals_sent", 0))
         avg_deal  = (rev_won / t_won) if t_won > 0 else 0
     def get_comparison(leads_df, deals_df, start_dt, end_dt):
-        # Strict Period Outcomes Logic
-        # Note: Input dfs are already globally filtered by the time window
-        won  = deals_df[
-            (deals_df["stage"].str.contains("closed won", case=False, na=False)) & 
+        
+        # If deals empty OR stage column missing → safe return
+        if deals_df.empty or "stage" not in deals_df.columns:
+            return {
+                "leads": len(leads_df),
+                "won_count": 0,
+                "rev_won": 0,
+                "rev_lost": 0,
+                "rev_touched": 0,
+                "win_rate": 0,
+                "nego": 0,
+                "prop": 0,
+                "avg_deal": 0
+            }
+
+        # Ensure required cols exist
+        for col in ["closed_time", "amount"]:
+            if col not in deals_df.columns:
+                deals_df[col] = 0
+
+        won = deals_df[
+            (deals_df["stage"].str.contains("closed won", case=False, na=False)) &
             (deals_df["closed_time"] >= start_dt)
         ]
+
         if end_dt and not won.empty:
             won = won[won["closed_time"] < end_dt]
 
         lost = deals_df[
-            (deals_df["stage"].str.contains("closed lost", case=False, na=False)) & 
+            (deals_df["stage"].str.contains("closed lost", case=False, na=False)) &
             (deals_df["closed_time"] >= start_dt)
         ]
+
         if end_dt and not lost.empty:
             lost = lost[lost["closed_time"] < end_dt]
 
         nego = deals_df[deals_df["stage"].str.contains("negotiation", case=False, na=False)]
         prop = deals_df[deals_df["stage"].str.contains("proposal|quote", case=False, na=False)]
-        
+
         rw = won["amount"].sum() if not won.empty else 0
         rl = lost["amount"].sum() if not lost.empty else 0
-        
+
         return {
             "leads": len(leads_df),
             "won_count": len(won),

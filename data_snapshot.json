@@ -183,6 +183,22 @@
       "source": "Google_Ads",
       "is_converted": false,
       "created_time": "2026-02-25T14:21:05+00:00"
+    },
+    {
+      "lead_id": "364067000043155062",
+      "owner_name": "Kushal Kalambi",
+      "status": "Not Contacted",
+      "source": "Google_Ads",
+      "is_converted": false,
+      "created_time": "2026-02-25T16:37:34+00:00"
+    },
+    {
+      "lead_id": "364067000043193153",
+      "owner_name": "Kushal Kalambi",
+      "status": "Not Contacted",
+      "source": "Facebook Ads",
+      "is_converted": false,
+      "created_time": "2026-02-25T17:23:43+00:00"
     }
   ],
   "deals": [
@@ -250,38 +266,38 @@
   "metrics": [
     {
       "id": 1,
-      "new_leads_today": 23,
+      "new_leads_today": 3,
       "leads_contacted": 318,
       "qualified_leads": 0,
       "demos_scheduled": 0,
       "demos_held": 0,
       "proposals_sent": 72,
       "negotiations_active": 20,
-      "deals_closed": 1,
-      "total_revenue": 400000,
-      "deal_amount_won": 400000,
+      "deals_closed": 0,
+      "total_revenue": 0,
+      "deal_amount_won": 0,
       "deal_amount_lost": 148485962,
-      "updated_at": "2026-02-25T16:14:12.008756+00:00",
-      "metric_date": "2026-02-25"
+      "updated_at": "2026-02-26T03:55:19.630338+00:00",
+      "metric_date": "2026-02-26"
     }
   ],
   "ai_table": [
     {
-      "id": "c4b901cb-20fe-4efb-9f3f-08ee085fb64d",
+      "id": "db2f4f90-d011-4890-8a26-60be87c9ac6b",
       "payload": {
-        "date": "2026-02-24",
+        "date": "2026-02-25",
         "overview": {
           "newLeads": {
-            "value": 23,
-            "isGood": true,
+            "value": 3,
+            "isGood": false,
             "trendStr": "vs 7-day avg",
-            "changePct": 130
+            "changePct": -70
           },
           "dealsClosed": {
-            "value": 1,
-            "isGood": true,
+            "value": 0,
+            "isGood": false,
             "trendStr": "vs 7-day avg",
-            "changePct": 0
+            "changePct": -100
           },
           "pipelineValue": {
             "value": "₹966.3L",
@@ -297,18 +313,18 @@
           }
         },
         "aiSummary": {
-          "text": "Primary Driver:\nThe funnel drop-off between Leads and Qualified stages is the most significant trend, with a 130% increase in leads compared to the 7-day average of 7. This indicates a potential bottleneck in lead qualification.\n\nSupporting Evidence: \n- New Leads Today: 23 (130% vs 7-day avg)\n- Funnel: Leads(15873) -> Contacted(1000) -> Qualified(392)\n\nContradiction Check:\nThe Win Rate is not disproving the Primary Driver, as it remains at 1.5%, which is within the expected range.\n\nOperational Impact:\nThis trend will change the total revenue workload this week by requiring additional resources to review and address potential funnel inefficiencies. Immediate diagnostic actions should focus on reviewing the Qualified stage specifically.",
-          "lastRunTime": "2/25/2026, 9:44:21 PM"
+          "text": "Primary Driver:\n- New Leads Today: 3 (-70% vs 7-day avg) \nThe significant drop in new leads today indicates a potential bottleneck in the lead generation process, which could impact pipeline growth and sales workload this week.\n\nSupporting Evidence:\n- Reference the primary metric (New Leads Today) and its % change\n- Reference the specific funnel stage or lead source volume\n\nContradiction Check:\n- The other metrics (Total Pipeline Value, Deals Won Today, Funnel, Win Rate) don't disprove the Primary Driver.",
+          "lastRunTime": "2/26/2026, 9:25:30 AM"
         },
         "vizInsights": {
-          "text": "The largest drop-off in the funnel is from \"Architect / Team Member\" to \"Proposal Sent\", with a 50% decrease in lead generation. The top performing lead source for this stage is AHA Main Website, which generated 71.4% of leads from this stage."
+          "text": "The largest drop-off in the funnel is from \"Architect / Team Member\" to \"Proposal Sent\", with a 47% decrease in lead count. The top performing lead source for this stage is AHA Main Website, which generated 71% of all leads sent to Proposal Sent.\n\nThe most effective source for winning was Architect Referral, generating 24% of all wins from the funnel."
         },
         "whatsappSummary": {
-          "text": "Daily CRM Summary – 2026-02-24\nNew Leads: 23\nDeals Won: undefined\nPipeline: ₹966.3L\nStrategic Signal: Leads and Pipeline are surging.\nTactical Solution: Assign high-value pipeline deals to senior reps only."
+          "text": "Daily CRM Summary – 2026-02-25\nNew Leads: 3\nDeals Won: undefined\nPipeline: ₹966.3L\nStrategic Signal: Growth surge is evident.\nTactical Solution: Assign high-value pipeline deals to senior reps only."
         }
       },
-      "created_at": "2026-02-25T16:14:21.657653+00:00"
+      "created_at": "2026-02-26T03:55:30.347736+00:00"
     }
   ],
-  "timestamp": "2026-02-25T16:48:51.218Z"
+  "timestamp": "2026-02-26T03:58:17.795Z"
 }
